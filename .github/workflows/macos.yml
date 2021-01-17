@@ -1,4 +1,4 @@
-name: Check_MacOS_Compile
+name: macOS
 
 on:
   push:
