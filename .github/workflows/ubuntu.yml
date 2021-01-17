@@ -1,4 +1,4 @@
-name: Check_Ubuntu_Compile
+name: Ubuntu
 
 on:
   push:
