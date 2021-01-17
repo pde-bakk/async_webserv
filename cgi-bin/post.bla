@@ -1,0 +1,16 @@
+#!/usr/bin/perl -wT
+use strict;
+use CGI qw(:standard);
+use CGI::Carp qw(warningsToBrowser fatalsToBrowser);
+
+print start_html;
+
+foreach my $key (sort(keys(%ENV))) {
+    print "$key = $ENV{$key}<br>\n";
+}
+
+use CGI qw( );
+my $cgi = CGI->new();
+my $json = $cgi->param('POSTDATA');
+
+print end_html;

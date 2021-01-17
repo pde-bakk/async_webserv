@@ -1,0 +1,29 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta content="text/html; charset=utf-8" http-equiv="Content-Type" />
+  <title>HTML redirect test</title>
+  <style>
+    input#submit {
+      display: block;
+}
+  </style>
+</head>
+<body>
+  <form id="redirect-form" action="/cgi-bin/redirect.pl" method="POST">
+    <fieldset>
+      <legend>Data to redirect</legend>
+      <label for="first_name">First Name</label><input id="first_name" name="first_name" value="John" />
+      <label for="last_name">Last Name</label><input id="last_name" name="last_name" value="Smith" />
+      <h3>Choose the redirect method:</h3>
+     	<input _type="radio" id="none" name="redirect-method" value="none" /><label for="location">No code</label>
+     	<input _type="radio" id="300" name="redirect-method" value="300" /><label for="300 multiple choices">300 multiple choices</label>
+     	<input _type="radio" id="301" name="redirect-method" value="301" /><label for="301 moved permanently">301 moved permanently</label>
+     	<input _type="radio" id="302" name="redirect-method" value="302" /><label for="302 found">302 found</label>
+     	<input _type="radio" id="303" name="redirect-method" value="303" /><label for="303 see other">303 see other</label>
+     	<input _type="radio" id="307" name="redirect-method" value="307" /><label for="307 temporary redirect">307 temporary redirect</label>
+      <input _type="submit" id="submit"/>
+    </fieldset>
+  </form>  
+</body>
+</html>

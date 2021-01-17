@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Welcome to Webserv!</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" _type="text/css" href="css/stylesheet.css">
+</head>
+<body class="success">
+<div id="Box">
+    <h2>Post</h2>
+    <form action="post.bla" method="post">
+        <div>
+            <label for="say">What greeting do you want to say?</label>
+            <input name="say" id="say" value="Hi">
+        </div>
+        <div>
+            <br/><label for="to">Who do you want to say it to?</label>
+            <input name="to" value="Mom">
+        </div>
+        <div>
+            <br/><button>Send my greetings with POST</button>
+        </div>
+    </form><br/>
+    <h2>Get</h2>
+    <form action="http://localhost:8080/" method="get">
+        <div>
+            <label for="say">What greeting do you want to say?</label>
+            <input name="say" id="say" value="Hi">
+        </div>
+        <div>
+            <br/><label for="to">Who do you want to say it to?</label>
+            <input name="to" value="Mom">
+        </div>
+        <div>
+            <br/><button>Send my greetings with GET</button>
+        </div>
+    </form>
+</div>
+</body>
+</html>
+
