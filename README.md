@@ -1,8 +1,8 @@
 # Webserv
 
-![Check_Ubuntu_Compile](https://github.com/skrtks/webserv/workflows/Check_Ubuntu_Compile/badge.svg)
-![Check_MacOS_Compile](https://github.com/skrtks/webserv/workflows/Check_MacOS_Compile/badge.svg)
+![Ubuntu](https://github.com/pde-bakk/async_webserv/workflows/Ubuntu/badge.svg)
+![macOS](https://github.com/pde-bakk/async_webserv/workflows/macOS/badge.svg)
 
-42's Webserv project by Sam Kortekaas, Tuan Perera and Peer de Bakker
+My async adaption of our 42 webserv project.
 
 ## Project status: [![Webserv status](https://badge42.herokuapp.com/api/project/pde-bakk/webserv)](https://github.com/JaeSeoKim/badge42)
