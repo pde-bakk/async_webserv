@@ -33,7 +33,7 @@ struct Client {
 				ipaddress;
 	time_t	lastRequest;
 	request_s	parsedRequest;
-	Mutex::Mutex	mut;
+	Mutex::Mutex<Client>	mut;
 	bool	TaskInProgress,
 			DoneReading;
 

@@ -59,7 +59,7 @@ int ThreadPool::findLaziestWorkerIndex() {
 			tmp;
 
 	for (size_t i = 0; i < this->numThreads; i++) {
-		Mutex::Guard	WorkerQGuard(this->workers[i]->Qmutex);
+		Mutex::Guard<TaskQueue>	WorkerQGuard(this->workers[i]->Qmutex);
 		tmp = this->workers[i]->WorkerTaskQueue.size();
 		if (tmp < lowest) {
 			lowest = tmp;
@@ -72,7 +72,7 @@ int ThreadPool::findLaziestWorkerIndex() {
 void ThreadPool::joinThreads() {
 	for (size_t i = 0; i < numThreads; i++) {
 		{
-			Mutex::Guard	WorkerLifeGuard(this->workers[i]->Life, "WorkerLife in joinThreads()");
+			Mutex::Guard<bool>	WorkerLifeGuard(this->workers[i]->Life, "WorkerLife in joinThreads()");
 			this->workers[i]->alive = false;
 		}
 		std::cout << "Waiting for thread/worker #" << i << " to join.\n";
@@ -84,8 +84,8 @@ void ThreadPool::joinThreads() {
 
 void ThreadPool::AddTaskToQueue(const std::pair<std::string, Client *>& NewTask) {
 //	this->conn->ConnMutex.lock();
-	Mutex::Guard	HandleGuard(conn->cHandleMut);
-	Mutex::Guard	DelGuard(conn->cDelMut);
+	Mutex::Guard<std::set<int> >	HandleGuard(conn->cHandleMut);
+	Mutex::Guard<std::set<int> >	DelGuard(conn->cDelMut);
 
 	if (this->conn->ClientsBeingHandled.count(NewTask.second->fd) == 0 && this->conn->ClientsToBeDeleted.count(NewTask.second->fd) == 0) {
 		this->ThreadPoolTaskQueue.push(NewTask);

@@ -32,15 +32,15 @@ class Connection {
 #if BONUS != 0
 	size_t	worker_amount;
 	ThreadPool*	threadPool;
-	Mutex::Mutex	readmutex,
-					readbakmutex,
-					writemutex,
-					writebakmutex;
-	Mutex::Mutex	cDelMut;
-	Mutex::Mutex	cHandleMut;
+	Mutex::Mutex<fd_set>	readmutex,
+							readbakmutex,
+							writemutex,
+							writebakmutex;
+	std::set<int>					ClientsBeingHandled,
+									ClientsToBeDeleted;
+	Mutex::Mutex<std::set<int> >	cDelMut,
+									cHandleMut;
 
-	std::set<int>	ClientsBeingHandled;
-	std::set<int>	ClientsToBeDeleted;
 #endif
 	Connection();
 public:

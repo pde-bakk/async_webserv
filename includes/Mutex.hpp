@@ -13,36 +13,55 @@
 
 namespace Mutex {
 
+	template <typename T>
 	class Mutex {
+		T&				_inner_type;
 		pthread_mutex_t _mut;
 		std::string _type;
 
 		Mutex(const Mutex &x); // coplien
 		Mutex &operator=(const Mutex &x); // coplien
 
-		void	assert(int opcode, const std::string& operation);
+		void	assert(int opcode, const std::string& operation) {
+			if (opcode != 0)
+				throw std::runtime_error("Couldn't " + operation + " my " + _type + " mutex because '" _RED + strerror(opcode) + _END "\n");
+		}
 	public:
+		template <typename T2>
 		friend class Guard;
-		Mutex();
-		explicit Mutex(const char *);
-		Mutex(char* x);
-		virtual ~Mutex();
-		void lock();
-		void unlock();
-
+		Mutex(T& x) : _inner_type(x), _mut(), _type() { this->assert(pthread_mutex_init(&_mut, 0), "initialize"); };
+		Mutex(T& x, const char* s) : _inner_type(x), _mut(), _type(s) { this->assert(pthread_mutex_init(&_mut, 0), "typed initialize"); }
+		virtual ~Mutex() { this->assert(pthread_mutex_destroy(&_mut), "destroy"); }
+		void lock() { this->assert(pthread_mutex_lock(&_mut), "lock"); }
+		void unlock() { this->assert(pthread_mutex_unlock(&_mut), "unlock"); }
 	};
 
+	template <typename T>
 	class Guard {
 		Guard(); // coplien
 		Guard(const Guard &x); // coplien
 		Guard &operator=(const Guard &x); // coplien
 
-		Mutex&		_mut;
+		Mutex<T>&	_mut;
 		std::string	_type;
 	public:
-		explicit Guard(Mutex& m);
-		explicit Guard(Mutex& m, const char*);
-		~Guard();
+		explicit Guard(Mutex<T>& m) : _mut(m), _type() { _mut.lock(); }
+		explicit Guard(Mutex<T>& m, const char* s) : _mut(m), _type(s) {
+			std::cout << "Waiting to lock mutexGuard " << _type << "\n";
+			_mut.lock();
+			std::cout << "Locked mutexGuard " << _type << "\n";
+		}
+		~Guard() {
+			if (_type.empty())
+			_mut.unlock();
+			else {
+				std::cout << "Waiting to unlock mutexGuard " << _type << "\n";
+				_mut.unlock();
+				std::cout << "Unlocked mutexGuard " << _type << "\n";
+			}
+		}
+		T&		get() { return _mut._inner_type; }
+		void	set(T x) { _mut._inner_type = x; }
 	};
 
 }
