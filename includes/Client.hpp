@@ -14,7 +14,7 @@
 #  define CONNECTION_LOGS 0
 # endif
 #ifndef BONUS
-# define BONUS 1
+# define BONUS 0
 #endif
 #define	BUFLEN 8192
 
@@ -33,9 +33,11 @@ struct Client {
 				ipaddress;
 	time_t	lastRequest;
 	request_s	parsedRequest;
+#if BONUS
 	Mutex::Mutex<Client>	mut;
 	bool	TaskInProgress,
 			DoneReading;
+#endif
 
 	explicit Client(Server* x, Connection* conn);
 	Client(const Client& x);

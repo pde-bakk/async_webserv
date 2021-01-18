@@ -49,8 +49,6 @@ void ThreadPool::giveTasksToWorker() {
 		std::cout << _WHITE "Gave a " << Task.first << " task to worker #" << index << "\n" _END;
 		ThreadPoolTaskQueue.pop();
 	}
-//	std::cout << _PURPLE "Done giving tasks to worker, back to select!\n" _END;
-//	usleep(50000);
 }
 
 int ThreadPool::findLaziestWorkerIndex() {

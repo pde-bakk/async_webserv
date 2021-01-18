@@ -72,15 +72,16 @@ void Worker::IOruntime() {
 }
 
 bool	Worker::handleClientRequest(Client* c) {
-	std::cout << _WHITE  _BOLD "gonna read on fd " << c->fd << "\n";
+//	std::cout << _WHITE  _BOLD "gonna read on fd " << c->fd << "\n";
 	int ret = c->receiveRequest();
-	std::cout << "receiveRequest returned " << ret << '\n';
+	(void)ret;
+//	std::cout << "receiveRequest returned " << ret << '\n';
 	std::cout << "c->req is " << c->req << "\n";
 	if (ft::checkIfEnded(c->req)) {
 		Mutex::Guard<fd_set>	WriteBakGuard(conn->writebakmutex);
 		FD_SET(c->fd, &writeFdsBak);
 		FD_SET(c->fd, &writeFds);
-		std::cout << c->fd << " done reading on " << c->fd << "\n";
+//		std::cout << c->fd << " done reading on " << c->fd << "\n";
 	}
 	return (!c->open);
 }
@@ -118,7 +119,6 @@ void Worker::giveTask(const Task& NewTask) {
 }
 
 void Worker::CommunicateWithConnection(int clientfd, bool DeletionNecessary) {
-	std::cout << "Comm with Conn, clientfd is " << clientfd << ", deletion? " << DeletionNecessary << "\n";
 	Mutex::Guard<std::set<int> >	HandleGuard(conn->cHandleMut);
 	this->conn->ClientsBeingHandled.erase(clientfd);
 
@@ -126,5 +126,4 @@ void Worker::CommunicateWithConnection(int clientfd, bool DeletionNecessary) {
 		Mutex::Guard<std::set<int> >	DelGuard(conn->cDelMut);
 		this->conn->ClientsToBeDeleted.insert(clientfd);
 	}
-	std::cout << "Worker is done comming with conn\n";
 }
