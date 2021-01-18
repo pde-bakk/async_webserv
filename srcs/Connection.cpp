@@ -63,9 +63,7 @@ void Connection::startListening() {
 	std::cout << "Waiting for connections..." _END << std::endl;
 	while (true) {
 		this->transferFD_sets();
-		std::cout << "before select call\n";
 		this->select();
-		std::cout << "after select\n";
 		this->handleCLI();
 		// Go through existing connections looking for data to read
 		for (std::vector<Server *>::iterator it = _servers.begin(); it != _servers.end(); ++it) {
@@ -114,8 +112,9 @@ void Connection::signalServer(int n) {
 
 void Connection::stopServer() {
 	// Go through existing connections and close them
-	std::cout << _RED _BOLD "threadpool at " << threadPool << "\n" _END;
+	std::cout << "before joiningThreads\n";
 	this->threadPool->joinThreads();
+	std::cout << "After joiningThreads\n";
 
 	std::vector<Server*>::iterator	sit;
 	for (sit = _servers.begin(); sit != _servers.end(); ++sit) {
@@ -127,7 +126,6 @@ void Connection::stopServer() {
 	FD_ZERO(&writeFds);
 	FD_ZERO(&readFdsBak);
 	FD_ZERO(&writeFdsBak);
-	std::cout << _RED _BOLD "threadpool at " << threadPool << "\n" _END;
 	delete this->threadPool;
 	std::cout << "After deleting threadPool\n";
 	std::cout << _GREEN "Server stopped gracefully.\n" << _END;
@@ -239,12 +237,11 @@ void Connection::transferFD_sets() {
 
 void Connection::select() {
 	std::string selecterror("Select failed because of ");
-	struct timeval tv = { 1, 5000};
+	struct timeval tv = { 0, 5000};
 #if BONUS != 0
 	Mutex::Guard	readguard(this->readmutex),
 					writeguard(this->writemutex);
 #endif
-	std::cout << "now entering select call, i have the guards\n";
 	if (::select(this->getMaxFD(), &readFds, &writeFds, 0, &tv) == -1)
 		throw std::runtime_error(selecterror + strerror(errno));
 }

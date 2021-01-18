@@ -36,13 +36,13 @@ void Worker::IOruntime() {
 	while (true) {
 		usleep(100000);
 		{
-			Mutex::Guard LifeGuard(this->Life);
+			Mutex::Guard LifeGuard(this->Life, "Workerlife");
 			if (!this->alive) {
 				break;
 			}
 		}
 		{
-			Mutex::Guard	QMutexGuard(Qmutex);
+			Mutex::Guard	QMutexGuard(Qmutex, "Worker Qmutex");
 			if (this->WorkerTaskQueue.empty()) {
 				usleep(100000);
 				continue;
@@ -68,7 +68,6 @@ void Worker::IOruntime() {
 		if (clientfd > 2)
 			this->CommunicateWithConnection(clientfd, DeletionNecessary);
 	}
-	Life.unlock();
 	std::cout <<_PURPLE "IOruntime is over for thread #" << id << "\n" _END;
 }
 

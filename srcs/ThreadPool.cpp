@@ -72,7 +72,7 @@ int ThreadPool::findLaziestWorkerIndex() {
 void ThreadPool::joinThreads() {
 	for (size_t i = 0; i < numThreads; i++) {
 		{
-			Mutex::Guard	WorkerLifeGuard(this->workers[i]->Life);
+			Mutex::Guard	WorkerLifeGuard(this->workers[i]->Life, "WorkerLife in joinThreads()");
 			this->workers[i]->alive = false;
 		}
 		std::cout << "Waiting for thread/worker #" << i << " to join.\n";
