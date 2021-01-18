@@ -19,6 +19,8 @@
 
 #define BACKLOG 128
 
+class Connection;
+
 class Server {
 	public:
 		//coplien form
@@ -41,8 +43,9 @@ private:	//setters
 		void		configurelocation(const std::string& );
 public:
 		void		startListening();
-		int			addConnection();
+		int			addConnection(Connection*);
 		void		showclients(const fd_set& readfds, const fd_set& writefds);
+		void		deleteclient(std::vector<Client*>::iterator& clientIt);
 		void		clearclients();
 		std::vector<Client*> _connections;
 

@@ -11,6 +11,7 @@
 /* ************************************************************************** */
 
 #include	"Server.hpp"
+#include	"Connection.hpp"
 #include	"libftGnl.hpp"
 #include	<cerrno>
 #include	<sys/stat.h>
@@ -31,6 +32,9 @@ Server::Server(int fd) : _port(80), _maxfilesize(1000000),
 
 Server::~Server() {
 	close(_socketFd);
+	FD_CLR(_socketFd, &readFdsBak);
+	FD_CLR(_socketFd, &writeFdsBak);
+	_socketFd = -1;
 	for (std::vector<Location*>::iterator it = _locations.begin(); it != _locations.end(); it++) {
 		delete *it;
 	}
@@ -41,7 +45,7 @@ Server::~Server() {
 //	}
 	_locations.clear();
 	_indexes.clear();
-//	_connections.clear();
+//	_connections.joinThreads();
 }
 
 Server::Server(const Server& x) : _port(), _maxfilesize(), _fd(), _socketFd(), addr() {
@@ -282,8 +286,8 @@ void Server::startListening() {
 	}
 }
 
-int Server::addConnection() {
-	this->_connections.push_back(new Client(this));
+int Server::addConnection(Connection* x) {
+	this->_connections.push_back(new Client(this, x));
 	return _connections.back()->fd;
 }
 
@@ -318,6 +322,12 @@ void Server::clearclients() {
 		delete *it;
 	}
 	_connections.clear();
+}
+
+void Server::deleteclient(std::vector<Client *>::iterator& clientIt) {
+	Client* byebye = *clientIt;
+	clientIt = _connections.erase(clientIt);
+	delete byebye;
 }
 
 std::ostream& operator<<( std::ostream& o, const Server& x) {

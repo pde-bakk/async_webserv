@@ -12,76 +12,81 @@
 
 //typedef void (Task)(Client*);
 
-Worker::Worker() : id(), alive(true), conn(), TaskQueue(), Qmutex("Worker Queue"), Life("Life") {
+Worker::Worker() : id(), alive(true), conn(), WorkerTaskQueue(), Qmutex("Qmutex"), Life("Life") {
+}
+
+Worker::Worker(int id, Connection *connection) : id(id), alive(true), conn(connection), WorkerTaskQueue(), Qmutex("Qmutex"), Life("WorkerLife") {
+
 }
 
 Worker::~Worker() {
 	this->alive = false;
-	while (!TaskQueue.empty())
-		TaskQueue.pop();
-	Qmutex.lock();
-	Life.lock();
-	Qmutex.unlock();
-	Life.unlock();
+	while (!WorkerTaskQueue.empty())
+		WorkerTaskQueue.pop();
+	{
+		Mutex::Guard	QMutexGuard(Qmutex);
+		Mutex::Guard	LifeGuard(Life);
+	}
 	std::cout << "worker #" << id << " dies\n";
 }
 
-void Worker::IOruntime(int index, Connection* x) {
-	this->conn = x;
-	this->id = index;
+void Worker::IOruntime() {
 	Client*		c;
 	std::pair<std::string, Client*> task;
-	Life.lock();
-	while (this->alive) {
-		Life.unlock();
-		this->Qmutex.lock();
-		if (this->TaskQueue.empty()) {
-			this->Qmutex.unlock();
-			this->Life.lock();
-			usleep(1000);
-			continue;
+	while (true) {
+		usleep(100000);
+		{
+			Mutex::Guard LifeGuard(this->Life);
+			if (!this->alive) {
+				break;
+			}
 		}
-		task = this->TaskQueue.front();
-		this->TaskQueue.pop();
-		this->Qmutex.unlock();
+		{
+			Mutex::Guard	QMutexGuard(Qmutex);
+			if (this->WorkerTaskQueue.empty()) {
+				usleep(100000);
+				continue;
+			}
+			std::cout << "Lets call queue.front()\n";
+			task = this->WorkerTaskQueue.front();
+			this->WorkerTaskQueue.pop();
+			std::cout << "Close worker q guard pls?\n";
+		}
 		c = task.second;
-		c->mut.lock();
-		std::cout << _YELLOW "Worker LOCKED client mutex\n" _END;
-		if (task.first == "receive")
-			handleClientRequest(c);
-		else if (task.first == "handle") {
-			handleClientResponse(c); }
-
-		c->mut.unlock();
-		std::cout << _YELLOW "Worker just unlocked client mutex\n" _END;
-		Life.lock();
+		int clientfd;
+		bool DeletionNecessary;
+		{
+			Mutex::Guard ClientGuard(c->mut);
+			std::cout << _YELLOW "Worker LOCKED client mutex\n" _END;
+			clientfd = c->fd;
+			if (task.first == "receive")
+				DeletionNecessary = handleClientRequest(c);
+			else if (task.first == "handle")
+				DeletionNecessary = handleClientResponse(c);
+			std::cout << _YELLOW "Worker just unlocked client mutex\n" _END;
+		}
+		if (clientfd > 2)
+			this->CommunicateWithConnection(clientfd, DeletionNecessary);
 	}
 	Life.unlock();
 	std::cout <<_PURPLE "IOruntime is over for thread #" << id << "\n" _END;
 }
 
-void	Worker::handleClientRequest(Client* c) {
+bool	Worker::handleClientRequest(Client* c) {
 	std::cout << _WHITE  _BOLD "gonna read on fd " << c->fd << "\n";
-	std::cout << "Read is set: " << FD_ISSET(c->fd, &readFds) << "\n";
-	if (c->receiveRequest() == 1 && ft::checkIfEnded(c->req)) {
-		std::cout << c->fd << " done reading on " << c->fd << "\n";
-		conn->writebakmutex.lock();
+	int ret = c->receiveRequest();
+	std::cout << "receiveRequest returned " << ret << '\n';
+	std::cout << "c->req is " << c->req << "\n";
+	if (ft::checkIfEnded(c->req)) {
+		Mutex::Guard	WriteBakGuard(conn->writebakmutex);
 		FD_SET(c->fd, &writeFdsBak);
-		conn->writebakmutex.unlock();
+		FD_SET(c->fd, &writeFds);
+		std::cout << c->fd << " done reading on " << c->fd << "\n";
 	}
-
-	conn->ConnMutex.lock();
-	std::cout << "taskset has " << conn->TaskSet.size() << " tasks\n";
-	conn->TaskSet.erase(c->fd);
-	std::cout << "And now it only has " << conn->TaskSet.size() << " tasks\n";
-	conn->ConnMutex.unlock();
-	std::cout << "Read is set: " << FD_ISSET(c->fd, &readFds) << "\n";
-
-//	std::cout << _WHITE _BOLD << "fd " << c->fd << "'s request is: \n" << c->req << std::endl;
-std::cout << _END;
+	return (!c->open);
 }
 
-void	Worker::handleClientResponse(Client* c) {
+bool	Worker::handleClientResponse(Client* c) {
 	std::cout << _BOLD _PURPLE "HANDLING CLIENT RESPONSE\n" _END;
 	RequestParser					requestParser;
 	ResponseHandler					responseHandler;
@@ -101,19 +106,26 @@ void	Worker::handleClientResponse(Client* c) {
 		std::cout << _RED _BOLD "setting client " << c->fd << " to connection closed because responsehandler threw exception\n" _END;
 		c->open = false;
 	}
-	conn->writebakmutex.lock();
-	FD_CLR(c->fd, &writeFdsBak);
-	conn->writebakmutex.unlock();
-
-	conn->ConnMutex.lock();
-	conn->TaskSet.erase(c->fd);
-	conn->DeleteClients.insert(c->fd);
-	conn->ConnMutex.unlock();
-
+	{
+		Mutex::Guard	WriteBakGuard(conn->writebakmutex);
+		FD_CLR(c->fd, &writeFdsBak);
+	}
+	return true;
 }
 
-void Worker::giveTask(std::pair<std::string, Client *>& NewTask) {
-	this->Qmutex.lock();
-	this->TaskQueue.push(NewTask);
-	this->Qmutex.unlock();
+void Worker::giveTask(std::pair<std::string, Client *> NewTask) {
+	Mutex::Guard	QMutexGuard(this->Qmutex);
+	this->WorkerTaskQueue.push(NewTask);
+}
+
+void Worker::CommunicateWithConnection(int clientfd, bool DeletionNecessary) {
+	std::cout << "Comm with Conn, clientfd is " << clientfd << ", deletion? " << DeletionNecessary << "\n";
+	Mutex::Guard	HandleGuard(conn->cHandleMut);
+	this->conn->ClientsBeingHandled.erase(clientfd);
+
+	if (DeletionNecessary) {
+		Mutex::Guard	DelGuard(conn->cDelMut);
+		this->conn->ClientsToBeDeleted.insert(clientfd);
+	}
+	std::cout << "Worker is done comming with conn\n";
 }

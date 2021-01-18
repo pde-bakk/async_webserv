@@ -7,62 +7,50 @@
 #include <unistd.h>
 #include <pthread.h>
 
-ThreadPool::ThreadPool(size_t num) : numThreads(num), workerThreads(), workers(), worker_messages(), conn() {
-	this->setupfn();
-}
-
-ThreadPool::ThreadPool(size_t num, Connection *conn) : numThreads(num), workerThreads(), workers(), worker_messages(), conn(conn) {
+ThreadPool::ThreadPool(size_t num, Connection *conn) : numThreads(num), workerThreads(), workers(), conn(conn) {
 	this->setupfn();
 }
 
 void ThreadPool::setupfn() {
 	this->workerThreads = new pthread_t [numThreads];
-	this->worker_messages = new msg [numThreads];
-	this->workers = new Worker [numThreads];
 
 	for (size_t i = 0; i < numThreads; i++) {
-		this->worker_messages[i].index = i;
-		this->worker_messages[i].workerArray = this->workers;
-		this->worker_messages[i].conn = this->conn;
-	}
-
-	for (size_t i = 0; i < numThreads; i++) {
-		if (pthread_create(&workerThreads[i], NULL, worker_thread_function, &worker_messages[i]) != 0)
+		workers.push_back(new Worker(i, this->conn));
+		if (pthread_create(&workerThreads[i], NULL, worker_thread_function, workers[i]) != 0)
 			throw std::runtime_error("creating thread failed");
 	}
 }
 
-void *ThreadPool::worker_thread_function(void *param) {
-	msg* message = static_cast<msg *>(param);
-	(message->workerArray)[message->index].IOruntime(message->index, message->conn);
+void*	ThreadPool::worker_thread_function(void* param) {
+	Worker* worker = static_cast<Worker*>(param);
+	worker->IOruntime();
 	return NULL;
 }
 
 ThreadPool::~ThreadPool() {
 	std::cout << _GREEN "threadpools dtor" << "\n" _END;
-	delete[] this->worker_messages;
+	for (std::vector<Worker*>::iterator it = workers.begin(); it != workers.end(); it++) {
+		delete *it;
+		std::cout << "after deleting worker *it\n";
+	}
 	delete[] this->workerThreads;
-	delete[] this->workers;
 	std::cout << "threadpool is done!\n";
 }
 
-void ThreadPool::giveTasksToWorker(std::queue<std::pair<std::string, Client*> >& Queue) {
-	while (!Queue.empty()) {
-		std::pair<std::string, Client*> Task = Queue.front();
-		if (this->conn->TaskSet.count(Task.second->fd)) {
-			Queue.pop();
-			continue;
-		}
+void ThreadPool::giveTasksToWorker() {
+	while (!this->ThreadPoolTaskQueue.empty()) {
+		std::pair<std::string, Client*> Task = ThreadPoolTaskQueue.front();
+		std::cout << "we have " << this->numThreads << " workers\n";
 		int index = this->findLaziestWorkerIndex();
+		std::cout << "laziest mofo is number " << index << "\n";
 		Task.second->TaskInProgress = true;
 
-		this->workers[index].giveTask(Task);
-		this->conn->TaskSet.insert(Task.second->fd);
+		this->workers[index]->giveTask(Task);
 		std::cout << _WHITE "Gave a " << Task.first << " task to worker #" << index << "\n" _END;
-		Queue.pop();
+		ThreadPoolTaskQueue.pop();
 	}
-	std::cout << _PURPLE "Done giving tasks to worker, back to select!\n";
-	usleep(50000);
+//	std::cout << _PURPLE "Done giving tasks to worker, back to select!\n" _END;
+//	usleep(50000);
 }
 
 int ThreadPool::findLaziestWorkerIndex() {
@@ -71,10 +59,9 @@ int ThreadPool::findLaziestWorkerIndex() {
 			tmp;
 
 	for (size_t i = 0; i < this->numThreads; i++) {
-		this->workers[i].Qmutex.lock();
-		tmp = this->workers[i].TaskQueue.size();
-		this->workers[i].Qmutex.unlock();
-		if (lowest > tmp) {
+		Mutex::Guard	WorkerQGuard(this->workers[i]->Qmutex);
+		tmp = this->workers[i]->WorkerTaskQueue.size();
+		if (tmp < lowest) {
 			lowest = tmp;
 			index = i;
 		}
@@ -82,15 +69,30 @@ int ThreadPool::findLaziestWorkerIndex() {
 	return index;
 }
 
-void ThreadPool::clear() {
+void ThreadPool::joinThreads() {
 	for (size_t i = 0; i < numThreads; i++) {
-		std::cout << "i is " << i << "\n";
-		workers[i].Life.lock();
-		workers[i].alive = false;
-		workers[i].Life.unlock();
+		{
+			Mutex::Guard	WorkerLifeGuard(this->workers[i]->Life);
+			this->workers[i]->alive = false;
+		}
 		std::cout << "Waiting for thread/worker #" << i << " to join.\n";
 		int joinret = pthread_join(workerThreads[i], 0);
 		std::cout << "joined thread, return is " << joinret << "\n";
 	}
 	std::cerr << "All threads have been joined\n";
+}
+
+void ThreadPool::AddTaskToQueue(const std::pair<std::string, Client *>& NewTask) {
+//	this->conn->ConnMutex.lock();
+	Mutex::Guard	HandleGuard(conn->cHandleMut);
+	Mutex::Guard	DelGuard(conn->cDelMut);
+
+	if (this->conn->ClientsBeingHandled.count(NewTask.second->fd) == 0 && this->conn->ClientsToBeDeleted.count(NewTask.second->fd) == 0) {
+		this->ThreadPoolTaskQueue.push(NewTask);
+		this->conn->ClientsBeingHandled.insert(NewTask.second->fd);
+		std::cout << "I pushed new " << NewTask.first << " Task to the queue for client " << NewTask.second->fd << "\n";
+	} else
+		std::cout << _RED "\tError trying to push task to queue\n" _END;
+	std::cout << "WorkerTaskQueue has size: " << ThreadPoolTaskQueue.size() << "\n";
+
 }

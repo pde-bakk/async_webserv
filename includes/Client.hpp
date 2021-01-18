@@ -18,8 +18,10 @@
 #endif
 #define	BUFLEN 8192
 
+class Connection;
 class Server;
 struct Client {
+	Connection* conn;
 	Server* parent;
 	int		fd,
 			port;
@@ -31,12 +33,11 @@ struct Client {
 				ipaddress;
 	time_t	lastRequest;
 	request_s	parsedRequest;
-	Mutex	mut,
-			CheckMut;
+	Mutex::Mutex	mut;
 	bool	TaskInProgress,
 			DoneReading;
 
-	explicit Client(Server* x);
+	explicit Client(Server* x, Connection* conn);
 	Client(const Client& x);
 	Client&	operator=(const Client& x);
 	~Client();

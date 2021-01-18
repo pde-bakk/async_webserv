@@ -15,21 +15,24 @@ class Worker {
 	int			id;
 	bool 		alive;
 	Connection*	conn;
-	std::queue<std::pair<std::string, Client*> >	TaskQueue;
-	Mutex		Qmutex,
-				Life;
+	std::queue<std::pair<std::string, Client*> >	WorkerTaskQueue;
+	Mutex::Mutex	Qmutex;
+	Mutex::Mutex	Life;
 
 public:
 	friend class Connection;
 	friend class ThreadPool;
 	Worker();
+	Worker(int id, Connection* connection);
 	virtual ~Worker();
 
-	void	IOruntime(int index, Connection*);
-	void	handleClientRequest(Client* c);
-	void	handleClientResponse(Client* c);
+	void	IOruntime();
+	bool 	handleClientRequest(Client* c);
+	bool 	handleClientResponse(Client* c);
 
-	void	giveTask(std::pair<std::string, Client*>& NewTask);
+	void	CommunicateWithConnection(int clientfd, bool deletion);
+
+	void	giveTask(std::pair<std::string, Client*> NewTask);
 };
 
 

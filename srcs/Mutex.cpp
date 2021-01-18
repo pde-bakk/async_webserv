@@ -3,62 +3,49 @@
 //
 
 #include "Mutex.hpp"
-#include <stdexcept>
-#include <cstring>
-#include <iostream>
 
-Mutex::Mutex() : _mut(), _type() {
-	int ret = pthread_mutex_init(&_mut, 0);
-	if (ret != 0)
-		error("initialize", ret);
-//	debug("initialize");
-}
+namespace Mutex {
 
-Mutex::Mutex(const char* type) : _mut() {
-	this->_type = type;
-	int ret = pthread_mutex_init(&_mut, 0);
-	if (ret != 0)
-		error("initialize", ret);
-//	debug("initialize");
-}
-
-Mutex::~Mutex() {
-	int ret = pthread_mutex_destroy(&_mut);
-	if (ret != 0)
-		error("destroy", ret);
-//	debug("destroy");
-}
-
-void Mutex::lock() {
-	int ret = pthread_mutex_lock(&_mut);
-	if (ret != 0)
-		error("lock", ret);
-//	debug("lock");
-}
-
-void Mutex::unlock() {
-	int ret = pthread_mutex_unlock(&_mut);
-	if (ret != 0)
-		error("unlock", ret);
-//	debug("unlock");
-}
-
-void Mutex::error(const std::string& operation, int& opcode) {
-	std::cerr << "Couldn't " + operation + " my " + _type + " mutex because: " + strerror(opcode) << std::endl;
-	throw std::runtime_error("Couldn't " + operation + " my " + _type + " mutex because: " + strerror(opcode));
-}
-
-void Mutex::debug(const std::string &operation) {
-	std::cerr << "I " + operation + " my " + _type + " mutex.\n";
-}
-
-Mutex &Mutex::operator=(const Mutex &x) {
-	if (this != &x) {
-		_type = x._type;
+	Mutex::Mutex() : _mut(), _type() {
+		this->assert(pthread_mutex_init(&_mut, 0), "initialize");
 	}
-	return *this;
+	Mutex::Mutex(const char* x) : _mut(), _type(x) {
+		this->assert(pthread_mutex_init(&_mut, 0), "typed initialize");
+	}
+	Mutex::~Mutex() {
+		this->assert(pthread_mutex_destroy(&_mut), "destroy");
+	}
+
+	void Mutex::lock() {
+//		std::cout << "locking " << _type << "\n";
+		this->assert(pthread_mutex_lock(&_mut), "lock");
+	}
+	void Mutex::unlock() {
+//		std::cout << "unlocking " << _type << "\n";
+		this->assert(pthread_mutex_unlock(&_mut), "unlock");
+	}
+
+	void	Mutex::assert(int opcode, const std::string& operation) {
+		if (opcode != 0)
+			throw std::runtime_error("Couldn't " + operation + " my " + _type + " mutex because '" _RED + strerror(opcode) + _END "\n");
+	}
+
+	Guard::Guard(Mutex& m) : _mut(m), _type() {
+		_mut.lock();
+	}
+	Guard::Guard(Mutex& m, const char* x) : _mut(m), _type(x) {
+		std::cout << "Waiting to lock mutexGuard " << _type << "\n";
+		_mut.lock();
+		std::cout << "Locked mutexGuard " << _type << "\n";
+	}
+	Guard::~Guard() {
+		if (_type.empty())
+			_mut.unlock();
+		else {
+			std::cout << "Waiting to unlock mutexGuard " << _type << "\n";
+			_mut.unlock();
+			std::cout << "Unlocked mutexGuard " << _type << "\n";
+		}
+	}
 }
 
-Mutex::Mutex(const Mutex &x) : _mut(), _type() {
-	*this = x;
-}

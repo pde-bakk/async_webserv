@@ -32,18 +32,20 @@ class Connection {
 #if BONUS != 0
 	size_t	worker_amount;
 	ThreadPool*	threadPool;
-	Mutex		readmutex,
-				readbakmutex,
-				writemutex,
-				writebakmutex,
-				ConnMutex;
-	std::queue<std::pair<std::string, Client*> >	TaskQueue;
-	std::set<int>	TaskSet;
-	std::set<int>	DeleteClients;
+	Mutex::Mutex	readmutex,
+					readbakmutex,
+					writemutex,
+					writebakmutex;
+	Mutex::Mutex	cDelMut;
+	Mutex::Mutex	cHandleMut;
+
+	std::set<int>	ClientsBeingHandled;
+	std::set<int>	ClientsToBeDeleted;
 #endif
 	Connection();
 public:
 	friend class Worker;
+	friend struct Client;
 	friend class ThreadPool;
 	explicit Connection(char* configPath);
 	Connection(const Connection &obj);
@@ -60,13 +62,12 @@ public:
 	static void signalServer(int n);
 	int		getMaxFD();
 	void	transferFD_sets();
+	void	select();
 	void	checkServer(Server* s);
 
 	void	receiveRequest(Client* c);
 	void	handleResponse(Client* c);
-	bool	manageClient(Client* c);
 	void	deleteTimedOutClients();
-
 };
 
 #endif //CONNECTION_HPP

@@ -11,7 +11,7 @@
 
 int g_sigpipe;
 
-Client::Client(Server* S) : parent(S), fd(), port(), open(true), addr(), size(sizeof(addr)), lastRequest(0), parsedRequest(), mut("client"), TaskInProgress(false), DoneReading() {
+Client::Client(Server* S, Connection* conn) : conn(conn), parent(S), fd(), port(), open(true), addr(), size(sizeof(addr)), lastRequest(0), parsedRequest(), mut(), TaskInProgress(false), DoneReading() {
 	bzero(&addr, size);
 	this->fd = accept(S->getSocketFd(), (struct sockaddr*)&addr, &size);
 	if (this->fd == -1) {
@@ -31,6 +31,8 @@ Client::Client(Server* S) : parent(S), fd(), port(), open(true), addr(), size(si
 	this->port = htons(addr.sin_port);
 	this->ipaddress = host + ':' + ft::inttostring(port);
 
+
+	Mutex::Guard readFdsBakGuard(conn->readbakmutex);
 	FD_SET(this->fd, &readFdsBak);
 
 //	if (CONNECTION_LOGS)
@@ -40,13 +42,18 @@ Client::Client(Server* S) : parent(S), fd(), port(), open(true), addr(), size(si
 Client::~Client() {
 	std::cout << "deleting client on fd " << fd << "\n";
 	close(fd);
-	mut.lock();
-	mut.unlock();
-	fd = -1;
 	req.clear();
 	this->parsedRequest.clear();
+	Mutex::Guard	readBakGuard(this->conn->readbakmutex);
+	Mutex::Guard	writeBakGuard(this->conn->writebakmutex);
 	FD_CLR(this->fd, &readFdsBak);
 	FD_CLR(this->fd, &writeFdsBak);
+	fd = -1;
+	std::cout << _PURPLE "end of Client::~Client\n";
+	std::cout << "still need to destroy mutexes tho\n" _END;
+	{
+		Mutex::Guard	ClientMutexGuard(this->mut);
+	}
 }
 
 int Client::receiveRequest() {
@@ -65,9 +72,9 @@ int Client::receiveRequest() {
 	}
 	if (recvRet == -1) {
 		std::cout << _RED "After recv loop, recvRet is " << recvRet << ", and recvCheck is " << std::boolalpha << recvCheck << "\n" _END;
-		std::cout << strerror(errno) << "\n";
+		std::cout << _RED << strerror(errno) << "\n" _END;
 	}
-	if (recvRet == 0) { // socket closed
+	if (recvRet == 0 || !recvCheck) { // socket closed
 		std::cerr << _RED _BOLD "Socket closed\n" _END;
 		this->open = false;
 		return (0);
@@ -138,7 +145,7 @@ void Client::reset() {
 	this->parsedRequest.clear();
 }
 
-Client::Client() : parent(), fd(), port(), open(), addr(), size(), lastRequest(), TaskInProgress(), DoneReading() {
+Client::Client() : conn(), parent(), fd(), port(), open(), addr(), size(), lastRequest(), mut(), TaskInProgress(), DoneReading() {
 
 }
 
@@ -165,14 +172,13 @@ Client &Client::operator=(const Client &x) {
 		ipaddress = x.ipaddress;
 		lastRequest = x.lastRequest;
 		parsedRequest = x.parsedRequest;
-		mut = x.mut;
 		TaskInProgress = x.TaskInProgress;
 		DoneReading = x.DoneReading;
 	}
 	return *this;
 }
 
-Client::Client(const Client &x) : parent(), fd(), port(), open(), addr(), size(), lastRequest(), TaskInProgress(), DoneReading() {
+Client::Client(const Client &x) : conn(), parent(), fd(), port(), open(), addr(), size(), lastRequest(), mut(), TaskInProgress(), DoneReading() {
 	*this = x;
 }
 
