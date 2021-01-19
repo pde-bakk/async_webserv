@@ -124,19 +124,26 @@ int Client::receiveRequest() {
 		buf[recvRet] = '\0';
 		this->req.append(buf);
 		recvCheck = true;
+#if BONUS
+		DoneReading = false;
+#endif
 	}
 	if (recvRet == -1) {
 		std::cout << _RED "After recv loop, recvRet is " << recvRet << ", and recvCheck is " << std::boolalpha << recvCheck << "\n" _END;
 		std::cout << _RED << strerror(errno) << "\n" _END;
 	}
 	if (recvRet == 0 || !recvCheck) { // socket closed
-		if (recvRet == 0) {
+#if BONUS
+		if (recvRet == 0 || DoneReading) {
 			std::cerr << _RED _BOLD "Socket closed\n" _END;
 			this->open = false;
-		}
+		} else if (!DoneReading)
+			DoneReading = true;
+#else
+		this->open = false;
+#endif
 		return (0);
 	}
-
 	return (1);
 }
 
