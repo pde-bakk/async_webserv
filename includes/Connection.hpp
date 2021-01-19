@@ -30,7 +30,7 @@ class Connection {
 	std::set<int>	_allConnections;
 	std::vector<Server*> _servers;
 	char* _configPath;
-#if BONUS != 0
+#if BONUS
 	size_t	worker_amount;
 	ThreadPool*	threadPool;
 	Mutex::Mutex<fd_set>	readmutex,

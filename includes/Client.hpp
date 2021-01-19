@@ -14,7 +14,7 @@
 #  define CONNECTION_LOGS 0
 # endif
 #ifndef BONUS
-# define BONUS 0
+# define BONUS 1
 #endif
 #define	BUFLEN 8192
 

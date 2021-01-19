@@ -59,7 +59,7 @@ Connection::Connection() : _socketFd(-1), _configPath()
 
 Connection::Connection(const Connection& obj) : _socketFd(), _configPath()
 #if BONUS
-		worker_amount(0), threadPool(NULL),
+		,worker_amount(0), threadPool(NULL),
 		readmutex(readFds), readbakmutex(readFdsBak), writemutex(writeFds), writebakmutex(writeFdsBak),
 		cDelMut(ClientsToBeDeleted), cHandleMut(ClientsBeingHandled)
 #endif
@@ -223,7 +223,7 @@ void Connection::startListening() {
 		readFds = readFdsBak;
 		writeFds = writeFdsBak;
 //		this->_servers.front()->showclients(_readFds, _writeFds);
-		if (select(this->getMaxFD(), &readFds, &writeFds, 0, 0) == -1)
+		if (::select(this->getMaxFD(), &readFds, &writeFds, 0, 0) == -1)
 			throw std::runtime_error(strerror(errno));
 		if (FD_ISSET(0, &readFdsBak))
 			this->handleCLI();
@@ -330,7 +330,7 @@ void Connection::transferFD_sets() {
 
 void Connection::select() {
 	std::string selecterror("Select failed because of ");
-	struct timeval tv = { 0, 5000};
+	struct timeval tv = { 0, 500};
 	Mutex::Guard<fd_set>	readguard(this->readmutex),
 							writeguard(this->writemutex);
 	if (::select(this->getMaxFD(), &readFds, &writeFds, 0, &tv) == -1)

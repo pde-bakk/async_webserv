@@ -57,7 +57,7 @@ int ThreadPool::findLaziestWorkerIndex() {
 			tmp;
 
 	for (size_t i = 0; i < this->numThreads; i++) {
-		Mutex::Guard<TaskQueue>	WorkerQGuard(this->workers[i]->Qmutex);
+		Mutex::Guard<TaskQueue>	WorkerQGuard(this->workers[i]->Qmutex, "laziestworker");
 		tmp = this->workers[i]->WorkerTaskQueue.size();
 		if (tmp < lowest) {
 			lowest = tmp;

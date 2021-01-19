@@ -22,18 +22,19 @@ namespace Mutex {
 		Mutex(const Mutex &x); // coplien
 		Mutex &operator=(const Mutex &x); // coplien
 
-		void	assert(int opcode, const std::string& operation) {
+		void	assertMut(int opcode, const std::string& operation) {
 			if (opcode != 0)
 				throw std::runtime_error("Couldn't " + operation + " my " + _type + " mutex because '" _RED + strerror(opcode) + _END "\n");
 		}
 	public:
 		template <typename T2>
 		friend class Guard;
-		Mutex(T& x) : _inner_type(x), _mut(), _type() { this->assert(pthread_mutex_init(&_mut, 0), "initialize"); };
-		Mutex(T& x, const char* s) : _inner_type(x), _mut(), _type(s) { this->assert(pthread_mutex_init(&_mut, 0), "typed initialize"); }
-		virtual ~Mutex() { this->assert(pthread_mutex_destroy(&_mut), "destroy"); }
-		void lock() { this->assert(pthread_mutex_lock(&_mut), "lock"); }
-		void unlock() { this->assert(pthread_mutex_unlock(&_mut), "unlock"); }
+		Mutex(T& x) : _inner_type(x), _mut(), _type() { this->assertMut(pthread_mutex_init(&_mut, 0), "initialize"); };
+		Mutex(T& x, const char* s) : _inner_type(x), _mut(), _type(s) {
+			this->assertMut(pthread_mutex_init(&_mut, 0), "typed initialize"); }
+		virtual ~Mutex() { this->assertMut(pthread_mutex_destroy(&_mut), "destroy"); }
+		void lock() { this->assertMut(pthread_mutex_lock(&_mut), "lock"); }
+		void unlock() { this->assertMut(pthread_mutex_unlock(&_mut), "unlock"); }
 	};
 
 	template <typename T>

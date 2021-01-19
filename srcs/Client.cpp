@@ -130,8 +130,10 @@ int Client::receiveRequest() {
 		std::cout << _RED << strerror(errno) << "\n" _END;
 	}
 	if (recvRet == 0 || !recvCheck) { // socket closed
-		std::cerr << _RED _BOLD "Socket closed\n" _END;
-		this->open = false;
+		if (recvRet == 0) {
+			std::cerr << _RED _BOLD "Socket closed\n" _END;
+			this->open = false;
+		}
 		return (0);
 	}
 
