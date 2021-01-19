@@ -40,7 +40,7 @@ ifdef CONNECTION_LOGS
 endif
 ifdef BONUS
  CXXFLAGS += -D BONUS=$(BONUS) -pthread
- FILES += Worker ThreadPool Mutex
+ FILES += Worker ThreadPool
 endif
 
 # Colours

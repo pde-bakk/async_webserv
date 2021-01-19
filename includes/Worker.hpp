@@ -11,13 +11,16 @@
 
 class Connection;
 
+typedef std::pair<std::string, Client*>		Task;
+typedef std::queue<Task> TaskQueue;
+
 class Worker {
 	int			id;
 	bool 		alive;
 	Connection*	conn;
-	std::queue<std::pair<std::string, Client*> >	WorkerTaskQueue;
-	Mutex::Mutex	Qmutex;
-	Mutex::Mutex	Life;
+	TaskQueue	WorkerTaskQueue;
+	Mutex::Mutex<TaskQueue>	Qmutex;
+	Mutex::Mutex<bool>	Life;
 
 public:
 	friend class Connection;
@@ -32,7 +35,7 @@ public:
 
 	void	CommunicateWithConnection(int clientfd, bool deletion);
 
-	void	giveTask(std::pair<std::string, Client*> NewTask);
+	void	giveTask(const Task& NewTask);
 };
 
 

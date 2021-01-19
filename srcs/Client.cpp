@@ -11,7 +11,19 @@
 
 int g_sigpipe;
 
-Client::Client(Server* S, Connection* conn) : conn(conn), parent(S), fd(), port(), open(true), addr(), size(sizeof(addr)), lastRequest(0), parsedRequest(), mut(), TaskInProgress(false), DoneReading() {
+#if BONUS
+
+Client::Client() : conn(), parent(), fd(), port(), open(), addr(), size(), lastRequest(), mut(*this), TaskInProgress(), DoneReading() {
+}
+
+Client::Client(const Client &x) : conn(), parent(), fd(), port(), open(), addr(), size(), lastRequest(), mut(*this), TaskInProgress(), DoneReading() {
+	*this = x;
+}
+
+Client::Client(Server* S, Connection* conn) : conn(conn), parent(S), fd(), port(), open(true), addr(), size(sizeof(addr)), lastRequest(0), parsedRequest()
+	, mut(*this), TaskInProgress(false), DoneReading()
+
+{
 	bzero(&addr, size);
 	this->fd = accept(S->getSocketFd(), (struct sockaddr*)&addr, &size);
 	if (this->fd == -1) {
@@ -31,8 +43,7 @@ Client::Client(Server* S, Connection* conn) : conn(conn), parent(S), fd(), port(
 	this->port = htons(addr.sin_port);
 	this->ipaddress = host + ':' + ft::inttostring(port);
 
-
-	Mutex::Guard readFdsBakGuard(conn->readbakmutex);
+	Mutex::Guard<fd_set> readFdsBakGuard(conn->readbakmutex);
 	FD_SET(this->fd, &readFdsBak);
 
 //	if (CONNECTION_LOGS)
@@ -44,17 +55,62 @@ Client::~Client() {
 	close(fd);
 	req.clear();
 	this->parsedRequest.clear();
-	Mutex::Guard	readBakGuard(this->conn->readbakmutex);
-	Mutex::Guard	writeBakGuard(this->conn->writebakmutex);
+	Mutex::Guard<fd_set>	readBakGuard(this->conn->readbakmutex);
+	Mutex::Guard<fd_set>	writeBakGuard(this->conn->writebakmutex);
 	FD_CLR(this->fd, &readFdsBak);
 	FD_CLR(this->fd, &writeFdsBak);
 	fd = -1;
 	std::cout << _PURPLE "end of Client::~Client\n";
 	std::cout << "still need to destroy mutexes tho\n" _END;
 	{
-		Mutex::Guard	ClientMutexGuard(this->mut);
+		Mutex::Guard<Client>	ClientMutexGuard(this->mut);
 	}
 }
+#else
+Client::Client() : conn(), parent(), fd(), port(), open(), addr(), size(), lastRequest() {
+}
+Client::Client(const Client &x) : conn(), parent(), fd(), port(), open(), addr(), size(), lastRequest() {
+	*this = x;
+}
+
+
+Client::Client(Server* S, Connection* conn) : conn(conn), parent(S), fd(), port(), open(true), addr(), size(sizeof(addr)), lastRequest(0), parsedRequest() {
+	bzero(&addr, size);
+	this->fd = accept(S->getSocketFd(), (struct sockaddr*)&addr, &size);
+	if (this->fd == -1) {
+		std::cerr << _RED _BOLD "Error accepting connection\n" _END;
+		throw std::runtime_error(strerror(errno));
+	}
+	if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
+		std::cerr << _RED _BOLD "Error setting connection fd to be nonblocking\n" _END;
+		throw std::runtime_error(strerror(errno));
+	}
+	int opt = 1;
+	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
+		std::cerr << _RED _BOLD "Error setting connection fd socket options\n" _END;
+		throw std::runtime_error(strerror(errno));
+	}
+	this->host = inet_ntoa(addr.sin_addr);
+	this->port = htons(addr.sin_port);
+	this->ipaddress = host + ':' + ft::inttostring(port);
+
+	FD_SET(this->fd, &readFdsBak);
+
+//	if (CONNECTION_LOGS)
+	std::cerr << _YELLOW "Opened a new client for " << fd << " at " << ipaddress << std::endl << _END;
+}
+
+Client::~Client() {
+	std::cout << "deleting client on fd " << fd << "\n";
+	close(fd);
+	req.clear();
+	this->parsedRequest.clear();
+	FD_CLR(this->fd, &readFdsBak);
+	FD_CLR(this->fd, &writeFdsBak);
+	fd = -1;
+	std::cout << _PURPLE "end of Client::~Client\n";
+}
+#endif
 
 int Client::receiveRequest() {
 	char buf[BUFLEN + 1];
@@ -68,22 +124,24 @@ int Client::receiveRequest() {
 		buf[recvRet] = '\0';
 		this->req.append(buf);
 		recvCheck = true;
-		usleep(1000);
+#if BONUS
+		DoneReading = false;
+#endif
 	}
 	if (recvRet == -1) {
 		std::cout << _RED "After recv loop, recvRet is " << recvRet << ", and recvCheck is " << std::boolalpha << recvCheck << "\n" _END;
 		std::cout << _RED << strerror(errno) << "\n" _END;
 	}
 	if (recvRet == 0 || !recvCheck) { // socket closed
-		std::cerr << _RED _BOLD "Socket closed\n" _END;
-		this->open = false;
-		return (0);
-	}
-	else if (!recvCheck) {
-		if (!DoneReading)
+#if BONUS
+		if (recvRet == 0 || DoneReading) {
+			std::cerr << _RED _BOLD "Socket closed\n" _END;
+			this->open = false;
+		} else if (!DoneReading)
 			DoneReading = true;
-		else
-			std::cout << _RED "Closing connection, recvCheck is " << recvCheck << ", received " << recvRet << " bytes\n" _END;
+#else
+		this->open = false;
+#endif
 		return (0);
 	}
 	return (1);
@@ -145,10 +203,6 @@ void Client::reset() {
 	this->parsedRequest.clear();
 }
 
-Client::Client() : conn(), parent(), fd(), port(), open(), addr(), size(), lastRequest(), mut(), TaskInProgress(), DoneReading() {
-
-}
-
 void Client::breakOnSIGPIPE(int) {
 	std::cerr << _RED _BOLD << "sending response failed. shutting down connection.\n" _END;
 	g_sigpipe = 1;
@@ -172,13 +226,10 @@ Client &Client::operator=(const Client &x) {
 		ipaddress = x.ipaddress;
 		lastRequest = x.lastRequest;
 		parsedRequest = x.parsedRequest;
+#if BONUS
 		TaskInProgress = x.TaskInProgress;
 		DoneReading = x.DoneReading;
+#endif
 	}
 	return *this;
 }
-
-Client::Client(const Client &x) : conn(), parent(), fd(), port(), open(), addr(), size(), lastRequest(), mut(), TaskInProgress(), DoneReading() {
-	*this = x;
-}
-

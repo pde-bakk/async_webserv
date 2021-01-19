@@ -28,9 +28,13 @@ fd_set	readFds, // temp file descriptor list for select()
 				readFdsBak, // temp file descriptor list for select()
 				writeFdsBak;
 
-Connection::Connection(char* configPath) : _socketFd(), _configPath(), worker_amount(0), threadPool(),
-										   readmutex(), readbakmutex(), writemutex(), writebakmutex(),
-										   cDelMut(), cHandleMut() {
+Connection::Connection(char* configPath) : _socketFd(-1), _configPath()
+#if BONUS
+		,worker_amount(0), threadPool(NULL),
+		readmutex(readFds), readbakmutex(readFdsBak), writemutex(writeFds), writebakmutex(writeFdsBak),
+		cDelMut(ClientsToBeDeleted), cHandleMut(ClientsBeingHandled)
+#endif
+{
 	FD_ZERO(&readFds);
 	FD_ZERO(&writeFds);
 	FD_ZERO(&readFdsBak);
@@ -42,13 +46,28 @@ Connection::~Connection() {
 	this->stopServer();
 }
 
-Connection::Connection(const Connection& obj) : _socketFd(), _configPath(), worker_amount(), threadPool(),
-												readmutex(), readbakmutex(), writemutex(), writebakmutex(),
-												cDelMut(), cHandleMut() {
+
+Connection::Connection() : _socketFd(-1), _configPath()
+#if BONUS
+		,worker_amount(0), threadPool(NULL),
+		readmutex(readFds), readbakmutex(readFdsBak), writemutex(writeFds), writebakmutex(writeFdsBak),
+		cDelMut(ClientsToBeDeleted), cHandleMut(ClientsBeingHandled)
+#endif
+{
+
+}
+
+Connection::Connection(const Connection& obj) : _socketFd(), _configPath()
+#if BONUS
+		,worker_amount(0), threadPool(NULL),
+		readmutex(readFds), readbakmutex(readFdsBak), writemutex(writeFds), writebakmutex(writeFdsBak),
+		cDelMut(ClientsToBeDeleted), cHandleMut(ClientsBeingHandled)
+#endif
+{
 	*this = obj;
 }
 
-Connection& Connection::operator= (const Connection &obj) {
+Connection& Connection::operator=(const Connection &obj) {
 	if (this != &obj) {
 		this->_socketFd = obj._socketFd;
 		this->_servers = obj._servers;
@@ -58,42 +77,6 @@ Connection& Connection::operator= (const Connection &obj) {
 	return *this;
 }
 
-void Connection::startListening() {
-	std::cout << _GREEN _BOLD << this->worker_amount << " workers ";
-	std::cout << "Waiting for connections..." _END << std::endl;
-	while (true) {
-		this->transferFD_sets();
-		this->select();
-		this->handleCLI();
-		// Go through existing connections looking for data to read
-		for (std::vector<Server *>::iterator it = _servers.begin(); it != _servers.end(); ++it) {
-			Server *s = *it;
-			this->checkServer(s);
-			std::vector<Client *>::iterator itc = s->_connections.begin();
-			while (itc != s->_connections.end()) {
-				Client *c = *itc;
-				{
-					Mutex::Guard	HandleGuard(this->cHandleMut);
-					Mutex::Guard	DeletionGuard(this->cDelMut);
-					if (this->ClientsBeingHandled.count(c->fd) == 1 || this->ClientsToBeDeleted.count(c->fd) == 1) {
-//						std::cout << "Not handling " << c->fd << " this loop because " << (this->ClientsToBeDeleted.count(c->fd) ? "it should be deleted" : "its already being handled") << "\n";
-						++itc;
-						continue;
-					}
-				}
-				{
-					this->handleResponse(c);
-					this->receiveRequest(c);
-				}
-				++itc;
-				std::cout << _BLUE "\tmain loop unlocked the client mutex\n"  _END;
-			}
-		}
-		this->threadPool->giveTasksToWorker();
-		this->deleteTimedOutClients();
-	}
-}
-
 // ------------------ Process Handling ------------------------
 Connection*	THIS;
 void Connection::startServer() {
@@ -101,7 +84,14 @@ void Connection::startServer() {
 	THIS = this;
 	signal(SIGINT, Connection::signalServer);
 	signal(SIGPIPE, Client::breakOnSIGPIPE);
-	startListening();
+#if BONUS
+	if (worker_amount > 0)
+		this->multiThreadedListening();
+	else
+		this->startListening();
+#else
+	this->startListening();
+#endif
 }
 
 void Connection::signalServer(int n) {
@@ -112,9 +102,11 @@ void Connection::signalServer(int n) {
 
 void Connection::stopServer() {
 	// Go through existing connections and close them
+#if BONUS
 	std::cout << "before joiningThreads\n";
 	this->threadPool->joinThreads();
 	std::cout << "After joiningThreads\n";
+#endif
 
 	std::vector<Server*>::iterator	sit;
 	for (sit = _servers.begin(); sit != _servers.end(); ++sit) {
@@ -126,7 +118,9 @@ void Connection::stopServer() {
 	FD_ZERO(&writeFds);
 	FD_ZERO(&readFdsBak);
 	FD_ZERO(&writeFdsBak);
+#if BONUS
 	delete this->threadPool;
+#endif
 	std::cout << "After deleting threadPool\n";
 	std::cout << _GREEN "Server stopped gracefully.\n" << _END;
 }
@@ -140,11 +134,15 @@ void Connection::loadConfiguration() {
 		FD_SET((*it)->getSocketFd(), &readFdsBak);
 		this->_allConnections.insert((*it)->getSocketFd());
 	}
+#if BONUS
 	this->threadPool = new ThreadPool(this->worker_amount, this);
+#endif
 }
 
 void Connection::handleCLI() {
-	readmutex.lock();
+#if BONUS
+	Mutex::Guard<fd_set>	ReadGuard(this->readmutex);
+#endif
 
 	if (FD_ISSET(0, &readFds)) {
 		std::string input;
@@ -171,7 +169,6 @@ void Connection::handleCLI() {
 			std::cout << "Command \"" << input << "\" not found. Type \"help\" for available commands" << std::endl;
 		}
 	}
-	readmutex.unlock();
 }
 
 int Connection::getMaxFD() {
@@ -195,10 +192,12 @@ void Connection::parsefile() {
 			continue ;
 		ft::get_key_value(str, key, value);
 
+#if BONUS
 		if (key == "workers")
 			this->worker_amount = ft_atoi(value.c_str());
+#endif
 
-		else if (key == "server" && value == "{") {
+		if (key == "server" && value == "{") {
 			try {
 				Server *tmp = new Server();
 				if (!str.empty() &&
@@ -218,38 +217,128 @@ void Connection::parsefile() {
 		throw std::runtime_error("closing config file failed");
 }
 
-Connection::Connection() : _socketFd(), _configPath(), worker_amount(), threadPool(),
-						   readmutex(), readbakmutex(), writemutex(), writebakmutex(),
-						   cDelMut(), cHandleMut() {
+void Connection::startListening() {
+	std::cout << "Waiting for connections..." << std::endl;
+	while (true) {
+		readFds = readFdsBak;
+		writeFds = writeFdsBak;
+//		this->_servers.front()->showclients(_readFds, _writeFds);
+		if (::select(this->getMaxFD(), &readFds, &writeFds, 0, 0) == -1)
+			throw std::runtime_error(strerror(errno));
+		if (FD_ISSET(0, &readFdsBak))
+			this->handleCLI();
+		// Go through existing connections looking for data to read
+		for (std::vector<Server*>::iterator it = _servers.begin(); it != _servers.end(); ++it) {
+			Server*	s = *it;
+			if (FD_ISSET(s->getSocketFd(), &readFds)) {
+				int clientfd = s->addConnection(this);
+				this->_allConnections.insert(clientfd);
+				FD_SET(clientfd, &readFdsBak);
+			}
+			std::vector<Client*>::iterator itc = s->_connections.begin();
+			while (itc != s->_connections.end()) {
+				Client* c = *itc;
+				if (FD_ISSET(c->fd, &readFds)) {
+					if (c->receiveRequest() == 1 && ft::checkIfEnded(c->req)) {
+						FD_SET(c->fd, &writeFdsBak);
+						std::cerr << "Setting " << c->fd << " to be writeable\n";
+					}
+				}
+				if (FD_ISSET(c->fd, &writeFds)) {
+					RequestParser					requestParser;
+					ResponseHandler					responseHandler;
+					std::string						response;
 
+					c->parsedRequest = requestParser.parseRequest(c->req);
+					c->parsedRequest.server = c->parent;
+					c->parsedRequest.location = c->parent->matchlocation(c->parsedRequest.uri);
+
+					try {
+						response = responseHandler.handleRequest(c->parsedRequest);
+						c->sendReply(response.c_str(), c->parsedRequest);
+						std::cout << _CYAN << response << "\n" _END;
+						response.clear();
+						c->reset();
+					} catch (std::exception& e) {
+						c->open = false;
+					}
+					FD_CLR(c->fd, &writeFdsBak);
+				}
+				c->checkTimeout();
+				if (!c->open) {
+					FD_CLR(c->fd, &readFdsBak);
+					FD_CLR(c->fd, &writeFdsBak);
+					this->_allConnections.erase(c->fd);
+					delete *itc;
+					s->_connections.erase(itc);
+					if (s->_connections.empty())
+						break;
+					else {
+						itc = s->_connections.begin();
+						continue;
+					}
+				}
+				++itc;
+			}
+		}
+	}
+}
+
+#if BONUS
+void Connection::multiThreadedListening() {
+	std::cout << "Waiting for connections... with " << this->worker_amount << " workers" _END << std::endl;
+	while (true) {
+		this->transferFD_sets();
+		this->select();
+		this->handleCLI();
+		// Go through existing connections looking for data to read
+		for (std::vector<Server *>::iterator it = _servers.begin(); it != _servers.end(); ++it) {
+			Server *s = *it;
+			this->checkServer(s);
+			std::vector<Client *>::iterator itc = s->_connections.begin();
+			while (itc != s->_connections.end()) {
+				Client *c = *itc;
+				{
+					Mutex::Guard<std::set<int> >	HandleGuard(this->cHandleMut),
+							DeletionGuard(this->cDelMut);
+					if (this->ClientsBeingHandled.count(c->fd) == 1 || this->ClientsToBeDeleted.count(c->fd) == 1) {
+//						std::cout << "Not handling " << c->fd << " this loop because " << (this->ClientsToBeDeleted.count(c->fd) ? "it should be deleted" : "its already being handled") << "\n";
+						++itc;
+						continue;
+					}
+				}
+				{
+					this->handleResponse(c);
+					this->receiveRequest(c);
+				}
+				++itc;
+			}
+		}
+		this->threadPool->giveTasksToWorker();
+		this->deleteTimedOutClients();
+	}
 }
 
 void Connection::transferFD_sets() {
-#if BONUS != 0
-	Mutex::Guard	readguard(this->readmutex),
-					writeguard(this->writemutex),
-					readbakguard(this->readbakmutex),
-					writebakguard(this->writebakmutex);
-#endif
+	Mutex::Guard<fd_set>	readguard(this->readmutex),
+							writeguard(this->writemutex),
+							readbakguard(this->readbakmutex),
+							writebakguard(this->writebakmutex);
 	readFds = readFdsBak;
 	writeFds = writeFdsBak;
 }
 
 void Connection::select() {
 	std::string selecterror("Select failed because of ");
-	struct timeval tv = { 0, 5000};
-#if BONUS != 0
-	Mutex::Guard	readguard(this->readmutex),
-					writeguard(this->writemutex);
-#endif
+	struct timeval tv = { 0, 500};
+	Mutex::Guard<fd_set>	readguard(this->readmutex),
+							writeguard(this->writemutex);
 	if (::select(this->getMaxFD(), &readFds, &writeFds, 0, &tv) == -1)
 		throw std::runtime_error(selecterror + strerror(errno));
 }
 
 void Connection::checkServer(Server* s) {
-#if BONUS != 0
-	Mutex::Guard	readguard(this->readmutex);
-#endif
+	Mutex::Guard<fd_set>	readguard(this->readmutex);
 	if (FD_ISSET(s->getSocketFd(), &readFds)) {
 		std::cout << "lets accept a new client!\n";
 		int clientfd = s->addConnection(this);
@@ -260,10 +349,8 @@ void Connection::checkServer(Server* s) {
 }
 
 void Connection::receiveRequest(Client *c) {
-#if BONUS != 0
-	Mutex::Guard	readguard(this->readmutex),
-					writebakguard(this->writebakmutex);
-#endif
+	Mutex::Guard<fd_set>	readguard(this->readmutex),
+							writebakguard(this->writebakmutex);
 	std::cout << "\tchecking if I want to enqueue a receiving task \n";
 	if (FD_ISSET(c->fd, &readFds) && !c->DoneReading) {
 		std::cout << "\tI do!\n";
@@ -273,9 +360,7 @@ void Connection::receiveRequest(Client *c) {
 }
 
 void Connection::handleResponse(Client *c) {
-#if BONUS != 0
-	Mutex::Guard	writeguard(this->writemutex);
-#endif
+	Mutex::Guard<fd_set>	writeguard(this->writemutex);
 	if (FD_ISSET(c->fd, &writeFds)) {
 		this->threadPool->AddTaskToQueue(std::make_pair("handle", c));
 		std::cout << _CYAN "\tEnqueued response task on fd " << c->fd << "\n" _END;
@@ -290,13 +375,13 @@ void Connection::deleteTimedOutClients() {
 		for (client_it = serv->_connections.begin(); client_it != serv->_connections.end(); client_it++) {
 			Client* cli = *client_it;
 //			Mutex::Guard ClientGuard(cli->mut);
-			Mutex::Guard	ClientsDelGuard(this->cDelMut);
+			Mutex::Guard<std::set<int> >	ClientsDelGuard(this->cDelMut);
 			if (this->ClientsToBeDeleted.count(cli->fd) == 1) {
 				std::cout << "\tLet's delete client with fd " << cli->fd << "\n";
 				this->_allConnections.erase(cli->fd);
 				this->ClientsToBeDeleted.erase(cli->fd);
 				{
-					Mutex::Guard ClientsHandleGuard(this->cHandleMut);
+					Mutex::Guard<std::set<int> >	ClientsHandleGuard(this->cHandleMut);
 					this->ClientsBeingHandled.erase(cli->fd);
 				}
 				serv->deleteclient(client_it);
@@ -307,3 +392,5 @@ void Connection::deleteTimedOutClients() {
 		}
 	}
 }
+
+#endif

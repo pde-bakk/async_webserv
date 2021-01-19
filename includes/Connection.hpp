@@ -25,49 +25,49 @@ extern fd_set	readFds,
 				writeFdsBak;
 
 class Connection {
+	Connection();
 	int _socketFd;
 	std::set<int>	_allConnections;
 	std::vector<Server*> _servers;
 	char* _configPath;
-#if BONUS != 0
+#if BONUS
 	size_t	worker_amount;
 	ThreadPool*	threadPool;
-	Mutex::Mutex	readmutex,
-					readbakmutex,
-					writemutex,
-					writebakmutex;
-	Mutex::Mutex	cDelMut;
-	Mutex::Mutex	cHandleMut;
-
-	std::set<int>	ClientsBeingHandled;
-	std::set<int>	ClientsToBeDeleted;
-#endif
-	Connection();
+	Mutex::Mutex<fd_set>	readmutex,
+							readbakmutex,
+							writemutex,
+							writebakmutex;
+	std::set<int>					ClientsBeingHandled,
+									ClientsToBeDeleted;
+	Mutex::Mutex<std::set<int> >	cDelMut,
+									cHandleMut;
 public:
 	friend class Worker;
-	friend struct Client;
 	friend class ThreadPool;
+	void	multiThreadedListening();
+	void	transferFD_sets();
+	void	select();
+	void	checkServer(Server* s);
+	void	receiveRequest(Client* c);
+	void	handleResponse(Client* c);
+	void	deleteTimedOutClients();
+#endif
+public:
+	friend struct Client;
 	explicit Connection(char* configPath);
 	Connection(const Connection &obj);
 	Connection& operator= (const Connection &obj);
 	virtual ~Connection();
 
-	void startListening();
+	void		startListening();
 
-	void startServer();
-	void loadConfiguration();
-	void parsefile();
-	void handleCLI();
-	void stopServer();
+	void		startServer();
+	void		loadConfiguration();
+	void		parsefile();
+	void		handleCLI();
+	void		stopServer();
+	int			getMaxFD();
 	static void signalServer(int n);
-	int		getMaxFD();
-	void	transferFD_sets();
-	void	select();
-	void	checkServer(Server* s);
-
-	void	receiveRequest(Client* c);
-	void	handleResponse(Client* c);
-	void	deleteTimedOutClients();
 };
 
 #endif //CONNECTION_HPP

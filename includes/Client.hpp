@@ -33,9 +33,11 @@ struct Client {
 				ipaddress;
 	time_t	lastRequest;
 	request_s	parsedRequest;
-	Mutex::Mutex	mut;
+#if BONUS
+	Mutex::Mutex<Client>	mut;
 	bool	TaskInProgress,
 			DoneReading;
+#endif
 
 	explicit Client(Server* x, Connection* conn);
 	Client(const Client& x);
