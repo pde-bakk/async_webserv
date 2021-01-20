@@ -15,11 +15,10 @@ void	exit_fatal() {
 	exit(EXIT_FAILURE);
 }
 
-Cgi::Cgi() : _env() {
-
+Cgi::Cgi() : _env(NULL) {
 }
 
-Cgi::Cgi(const Cgi &x) : _env() {
+Cgi::Cgi(const Cgi &x) : _env(NULL) {
 	*this = x;
 }
 
@@ -31,7 +30,19 @@ Cgi &Cgi::operator=(const Cgi &x) {
 	return *this;
 }
 
+void	Cgi::clear_env() {
+	if (!this->_env)
+		return;
+	for (int i = 0; _env[i]; i++) {
+		free(_env[i]);
+		_env[i] = NULL;
+	}
+	free(_env);
+	_env = NULL;
+}
+
 Cgi::~Cgi() {
+	this->clear_env();
 	this->_m.clear();
 }
 
@@ -65,25 +76,20 @@ void Cgi::map_to_env(request_s& request) {
 	int i = 0;
 	this->_m.insert(request.env.begin(), request.env.end());
 	this->_env = (char**) ft_calloc(this->_m.size() + 1, sizeof(char*));
-	if (!_env)
+	if (!_env) {
+		this->clear_env();
 		exit_fatal();
+	}
 
 	for (std::map<std::string, std::string>::const_iterator it = _m.begin(); it != _m.end(); it++) {
 		std::string tmp = it->first + "=" + it->second;
 		this->_env[i] = ft_strdup(tmp.c_str());
-		if (!this->_env[i])
+		if (!this->_env[i]) {
+			this->clear_env();
 			exit_fatal();
+		}
 		++i;
 	}
-}
-
-void	Cgi::clear_env() {
-	for (int i = 0; _env[i]; i++) {
-		free(_env[i]);
-		_env[i] = NULL;
-	}
-	free(_env);
-	_env = NULL;
 }
 
 int Cgi::run_cgi(request_s &request, std::string& scriptpath, const std::string& OriginalUri) {
@@ -126,7 +132,6 @@ int Cgi::run_cgi(request_s &request, std::string& scriptpath, const std::string&
 		exit(EXIT_FAILURE);
 	}
 
-	this->clear_env();
 	waitpid(0, &status, 0);
 	if (WIFEXITED(status))
 		status = WEXITSTATUS(status);

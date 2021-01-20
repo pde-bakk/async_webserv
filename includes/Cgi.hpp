@@ -19,7 +19,7 @@ public:
 
 private:
 	void	populate_map(request_s&, const std::string&, bool redirect_status, std::string& scriptpath);
-	void map_to_env(request_s& request);
+	void	map_to_env(request_s& request);
 	void	clear_env();
 
 	std::map<std::string, std::string>	_m;
