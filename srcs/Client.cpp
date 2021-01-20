@@ -60,11 +60,7 @@ Client::~Client() {
 	FD_CLR(this->fd, &readFdsBak);
 	FD_CLR(this->fd, &writeFdsBak);
 	fd = -1;
-	std::cout << _PURPLE "end of Client::~Client\n";
-	std::cout << "still need to destroy mutexes tho\n" _END;
-	{
-		Mutex::Guard<Client>	ClientMutexGuard(this->mut);
-	}
+	Mutex::Guard<Client>	ClientMutexGuard(this->mut);
 }
 #else
 Client::Client() : conn(), parent(), fd(), port(), open(), addr(), size(), lastRequest() {
@@ -108,7 +104,6 @@ Client::~Client() {
 	FD_CLR(this->fd, &readFdsBak);
 	FD_CLR(this->fd, &writeFdsBak);
 	fd = -1;
-	std::cout << _PURPLE "end of Client::~Client\n";
 }
 #endif
 
@@ -124,24 +119,14 @@ int Client::receiveRequest() {
 		buf[recvRet] = '\0';
 		this->req.append(buf);
 		recvCheck = true;
-#if BONUS
-		DoneReading = false;
-#endif
 	}
 	if (recvRet == -1) {
 		std::cout << _RED "After recv loop, recvRet is " << recvRet << ", and recvCheck is " << std::boolalpha << recvCheck << "\n" _END;
-		std::cout << _RED << strerror(errno) << "\n" _END;
+//		std::cout << _RED << strerror(errno) << "\n" _END;
 	}
 	if (recvRet == 0 || !recvCheck) { // socket closed
-#if BONUS
-		if (recvRet == 0 || DoneReading) {
-			std::cerr << _RED _BOLD "Socket closed\n" _END;
-			this->open = false;
-		} else if (!DoneReading)
-			DoneReading = true;
-#else
+		std::cerr << "ClOSING SOCKET\n";
 		this->open = false;
-#endif
 		return (0);
 	}
 	return (1);
@@ -164,10 +149,10 @@ void Client::sendReply(const char* msg, request_s& request) const {
 		bytesToSend -= sendRet;
 	}
 	static int i = 1, post = 1;
-	std::cerr << _PURPLE "sent response for request #" << i++ << " (" << methodAsString(request.method);
+	std::cout << _PURPLE "sent response for request #" << i++ << " (" << methodAsString(request.method);
 	if (request.method == POST)
-		std::cerr << " #" << post++;
-	std::cerr << ").\n" _END;
+		std::cout << " #" << post++;
+	std::cout << ").\n" _END;
 }
 
 void Client::resetTimeout() {
@@ -188,15 +173,15 @@ void Client::checkTimeout() {
 
 void Client::reset() {
 	if (this->parsedRequest.headers[CONNECTION] == "close") {
-		std::cout << "Setting connection to closed because of request header\n";
+		std::cout << _CYAN "Setting connection to closed because of request header\n" _END;
 		if (CONNECTION_LOGS)
-			std::cerr << "We ain't resetting, we're closing this client, baby" << std::endl;
+			std::cout << "We ain't resetting, we're closing this client, baby" << "\n";
 		this->open = false;
 		return;
 	} else if (!this->open)
 		return;
 	if (CONNECTION_LOGS)
-		std::cerr << "Resetting client!\n";
+		std::cout << "Resetting client!\n";
 	this->open = true;
 	req.clear();
 	lastRequest = 0;

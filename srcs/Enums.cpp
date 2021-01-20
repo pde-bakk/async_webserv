@@ -3,6 +3,18 @@
 //
 #include "Enums.hpp"
 
+std::string StatusToString(const Status& in) {
+	switch (in) {
+		case IN_PROGRESS:
+			return "IN_PROGRESS";
+		case DONE_READING:
+			return "DONE_READING";
+		case DONE_WRITING:
+			return "DONE_WRITING";
+		default:
+			return "INVALID_STATUS";
+	}
+}
 
 std::string	headerTypeAsString(const headerType& header) {
 	switch (header) {

@@ -14,7 +14,6 @@
 #define RESPONSEHANDLER_HPP
 
 #include "RequestParser.hpp"
-#include "Cgi.hpp"
 #include <dirent.h>
 #include <vector>
 
@@ -25,7 +24,6 @@ class ResponseHandler {
 	std::map<int, std::string>			_status_codes;
 	std::string							_response;
 	std::string							_body;
-	Cgi									CGI;
 public:
 	friend class Connection;
 	ResponseHandler();
