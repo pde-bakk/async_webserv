@@ -87,11 +87,11 @@ re: fclean all
 run: clean all
 	./$(NAME)
 
-thread: $(OBJS) $(LIBFT) $(GNL)
-	@echo $(ECHO) "$(PREFIX)$(GREEN) Bundling executable... $(END)$(NAME)"
-	@$(CXX) $(CXXFLAGS) -fsanitize=thread $(OBJS) $(GNL) $(LIBFT) $(INCLUDE) -o $(NAME)
+.PHONY: clean fclean re all
+
+bonus: $(OBJS) $(LIBFT) $(GNL)
+	@$(CXX) $(CXXFLAGS) -g -fsanitize=thread -fopenmp $(SRCS) $(GNL) $(LIBFT) $(INCLUDE) -o $(NAME)
 	mkdir -p htmlfiles/Downloads
 	cp test/$(CGI_TESTER) YoupiBanane/youpi.bla
-	TSAN_OPTIONS=second_deadlock_stack=1 ./$(NAME)
+	TSAN_OPTIONS=second_deadlock_stack=1 ./$(NAME) #2> log.txt
 
-.PHONY: clean fclean re all

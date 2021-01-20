@@ -23,6 +23,7 @@
 #include <dirent.h>
 #include <cstring>
 #include "Colours.hpp"
+#include "Cgi.hpp"
 
 std::string getCurrentDatetime() {
 	time_t		time;
@@ -104,12 +105,13 @@ ResponseHandler& ResponseHandler::operator= (const ResponseHandler &rhs) {
 		this->_status_codes = rhs._status_codes;
 		this->_response	= rhs._response;
 		this->_body = rhs._body;
-		this->CGI = rhs.CGI;
 	}
 	return *this;
 }
 
 int ResponseHandler::generatePage(request_s& request) {
+	Cgi			cgi;
+
 	int			fd = -1;
 	struct stat statstruct = {};
 	std::string filepath(request.location->getroot());
@@ -117,17 +119,16 @@ int ResponseHandler::generatePage(request_s& request) {
 		filepath.append("/");
 	if (request.location->getlocationmatch() != request.uri)
 		filepath.append(request.uri, request.uri.rfind('/') + 1);
-
 	bool	validfile = stat(filepath.c_str(), &statstruct) == 0,
 			allowed_extension = request.location->isExtensionAllowed(filepath);
 
 	if ((request.uri.length() > 9 && request.uri.substr(0, 9) == "/cgi-bin/") || allowed_extension || (request.method == POST && !request.location->getdefaultcgipath().empty())) {
 		if (validfile && !S_ISDIR(statstruct.st_mode)) {
-			fd = this->CGI.run_cgi(request, filepath, request.uri);
+			fd = cgi.run_cgi(request, filepath, request.uri);
 		}
 		else if (!request.location->getdefaultcgipath().empty() && request.method == POST) {
 			std::string defaultcgipath = request.location->getdefaultcgipath();
-			fd = this->CGI.run_cgi(request, defaultcgipath, request.uri);
+			fd = cgi.run_cgi(request, defaultcgipath, request.uri);
 		}
 	}
 	else if (request.method == POST) {
@@ -316,7 +317,6 @@ void ResponseHandler::handlePut(request_s& request) {
 	}
 	else if (request.body.length() > request.location->getmaxbody()) { // If body length is higher than location::maxBody
 		this->_response += _status_codes[413];
-		this->_header_vals[CONNECTION] = "close";
 		handleBody(request);
 	}
 	else if (filePath[filePath.length() - 1] == '/' || (stat(filePath.c_str(), &statstruct) == 0 && S_ISDIR(statstruct.st_mode))) {
@@ -379,7 +379,6 @@ void ResponseHandler::generateResponse(request_s& request) {
 			throw std::runtime_error("Authorization failed!");
 		if (request.body.length() > request.location->getmaxbody()) {// If body length is higher than location::maxBody
 			request.status_code = 413;
-			this->_header_vals[CONNECTION] = "close";
 			throw std::runtime_error("Payload too large.");
 		}
 		negotiateLanguage(request);
@@ -447,7 +446,6 @@ void	ResponseHandler::handleStatusCode(request_s& request) {
 
 void ResponseHandler::handleALLOW(request_s& request) {
 	_header_vals[ALLOW] = request.location->getallowedmethods();
-	_response += "Allow: ";
 	_response += _header_vals[ALLOW];
 	_response += "\r\n";
 }

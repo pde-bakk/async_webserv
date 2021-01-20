@@ -11,13 +11,16 @@
 /* ************************************************************************** */
 
 #ifndef CONNECTION_HPP
-#define CONNECTION_HPP
-#include	"Server.hpp"
-#include	"Worker.hpp"
-#include	"ThreadPool.hpp"
-#include	<set>
-#include	<utility>
-#include 	<queue>
+# define CONNECTION_HPP
+# include	"Server.hpp"
+# if BONUS
+#  include	"Worker.hpp"
+#  include	"ThreadPool.hpp"
+# endif
+# include	<set>
+# include	<utility>
+# include 	<queue>
+# include 	"Enums.hpp"
 
 extern fd_set	readFds,
 				writeFds,
@@ -29,7 +32,8 @@ class Connection {
 	int _socketFd;
 	std::set<int>	_allConnections;
 	std::vector<Server*> _servers;
-	char* _configPath;
+	char*	_configPath;
+	bool	alive;
 #if BONUS
 	size_t	worker_amount;
 	ThreadPool*	threadPool;
@@ -37,10 +41,9 @@ class Connection {
 							readbakmutex,
 							writemutex,
 							writebakmutex;
-	std::set<int>					ClientsBeingHandled,
-									ClientsToBeDeleted;
-	Mutex::Mutex<std::set<int> >	cDelMut,
-									cHandleMut;
+	std::map<int, Status>					ClientsBeingHandled;
+	Mutex::Mutex<std::map<int, Status> >	cHandleMut;
+	Mutex::Mutex<bool>						AliveMut;
 public:
 	friend class Worker;
 	friend class ThreadPool;

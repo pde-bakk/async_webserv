@@ -6,6 +6,14 @@
 #define WEBSERV_ENUMS_HPP
 #include <string>
 
+enum Status {
+	IN_PROGRESS,
+	DONE_READING,
+	DONE_WRITING
+};
+
+std::string StatusToString(const Status& in);
+
 enum headerType { // TODO No ACCEPT_ENCODING???
 	ACCEPT_CHARSET,
 	ACCEPT_LANGUAGE,

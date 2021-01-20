@@ -11,7 +11,7 @@
 #include    "Mutex.hpp"
 
 # ifndef CONNECTION_LOGS
-#  define CONNECTION_LOGS 0
+#  define CONNECTION_LOGS 1
 # endif
 #ifndef BONUS
 # define BONUS 1

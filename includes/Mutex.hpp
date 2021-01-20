@@ -46,7 +46,9 @@ namespace Mutex {
 		Mutex<T>&	_mut;
 		std::string	_type;
 	public:
-		explicit Guard(Mutex<T>& m) : _mut(m), _type() { _mut.lock(); }
+		explicit Guard(Mutex<T>& m) : _mut(m), _type() {
+			_mut.lock();
+		}
 		explicit Guard(Mutex<T>& m, const char* s) : _mut(m), _type(s) {
 			std::cout << "Waiting to lock mutexGuard " << _type << "\n";
 			_mut.lock();
