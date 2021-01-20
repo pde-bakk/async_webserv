@@ -36,7 +36,8 @@ add_executable(webserv
 		includes/Worker.hpp
 		srcs/ThreadPool.cpp
 		includes/ThreadPool.hpp
-		srcs/Mutex.cpp
-		includes/Mutex.hpp)
+		includes/Mutex.hpp
+		srcs/ThreadSafeQueue.cpp
+		includes/ThreadSafeQueue.hpp)
 
 target_link_libraries(webserv PUBLIC libft)
