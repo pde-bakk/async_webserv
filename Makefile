@@ -13,7 +13,9 @@
 NAME = webserv
 FILES = main split utils Base64 Enums Cgi \
 		Server Client Location \
-		Connection RequestParser ResponseHandler
+		Connection RequestParser ResponseHandler \
+		Worker ThreadPool
+
 SRCS = $(addprefix srcs/, $(addsuffix .cpp, $(FILES)))
 OBJS = $(SRCS:.cpp=.o)
 INCLUDE = -Iincludes
@@ -54,12 +56,12 @@ all: $(NAME)
 
 $(NAME): $(OBJS) $(LIBFT) $(GNL)
 	@echo $(ECHO) "$(PREFIX)$(GREEN) Bundling executable... $(END)$(NAME)"
-	@$(CXX) $(CXXFLAGS) $(OBJS) $(GNL) $(LIBFT) $(INCLUDE) -o $@
+	@$(CXX) $(CXXFLAGS) $(OBJS) $(GNL) $(LIBFT) $(INCLUDE) -o $@ -pthread
 	mkdir -p htmlfiles/Downloads
 	cp test/$(CGI_TESTER) YoupiBanane/youpi.bla
 
 %.a: %
-	@echo $(ECHO) "$(PREFIX)$(GREEN) Compiling file $(END)$< $(GREEN)to $(END)$@"
+	@echo $(ECHO) "$(PREFIX) $(GREEN) Compiling file $(END)$< $(GREEN)to $(END)$@"
 	@make -s -C $<
 	@cp $</$@ .
 
@@ -84,10 +86,17 @@ fclean: clean
 
 re: fclean all
 
-run: clean all
-	./$(NAME)
-
 .PHONY: clean fclean re all
+
+threaddebug: $(OBJS) $(LIBFT) $(GNL)
+	@echo $(ECHO) "$(PREFIX)$(GREEN) Bundling executable... $(END)$(NAME)"
+	@$(CXX) $(CXXFLAGS) -g -fsanitize=address -fopenmp $(OBJS) $(GNL) $(LIBFT) $(INCLUDE) -o $(NAME)
+	mkdir -p htmlfiles/Downloads
+	cp test/$(CGI_TESTER) YoupiBanane/youpi.bla
+
+run:
+	TSAN_OPTIONS=second_deadlock_stack=1 ./$(NAME) #2> log.txt
+
 
 bonus: $(OBJS) $(LIBFT) $(GNL)
 	@$(CXX) $(CXXFLAGS) -g -fsanitize=thread -fopenmp $(SRCS) $(GNL) $(LIBFT) $(INCLUDE) -o $(NAME)
