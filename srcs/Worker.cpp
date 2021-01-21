@@ -51,17 +51,16 @@ void Worker::IOruntime() {
 				status = handleClientResponse(c);
 		}
 		{
-			Mutex::Guard<fd_set> WriteBakGuard(conn->writebakmutex);
-			if (status == DONE_READING) {
-				FD_SET(clientfd, &writeFdsBak);
-				std::cout << _YELLOW "clientfd has been set to writeable now\n";
-			}
-			if (status == DONE_WRITING) {
-				FD_CLR(clientfd, &writeFdsBak);
-				std::cout << _RED "Removing " << clientfd << " from writefdsbak\n";
-			}
+//			Mutex::Guard<fd_set> WriteBakGuard(conn->writebakmutex);
+//			if (status == DONE_READING) {
+//				FD_SET(clientfd, &writeFdsBak);
+//				std::cout << _YELLOW "clientfd has been set to writeable now\n";
+//			}
+//			if (status == DONE_WRITING) {
+//				FD_CLR(clientfd, &writeFdsBak);
+//				std::cout << _RED "Removing " << clientfd << " from writefdsbak\n";
+//			}
 		}
-		std::cout << "Client status is " << StatusToString(status) << "\n";
 		if (clientfd > 2)
 			this->CommunicateWithConnection(clientfd, status);
 		delete task;
@@ -70,13 +69,8 @@ void Worker::IOruntime() {
 
 Status	Worker::handleClientRequest(Client* c) {
 	if (c->receiveRequest() == 1 && ft::checkIfEnded(c->req)) {
-//		std::cout << "Yes we done reading bby\n";
-//		std::cout << _WHITE _BOLD << c->req << "\n" _END;
-		std::cout << "Done reading\n";
 		return DONE_READING;
 	}
-	std::cout << "Still not done reading bby\n";
-	std::cout << _WHITE << "size is " << c->req.size() << "\n" _END;
 	return IN_PROGRESS;
 }
 
@@ -95,7 +89,6 @@ Status	Worker::handleClientResponse(Client* c) {
 		c->reset();
 	} catch (std::exception& e) {
 		std::cout << _RED _BOLD "setting client " << c->fd << " to connection closed because responsehandler threw exception\n" _END;
-		std::cout << _RED << response << "\n" _END;
 		c->open = false;
 	}
 	response.clear();
@@ -103,12 +96,9 @@ Status	Worker::handleClientResponse(Client* c) {
 }
 
 void Worker::CommunicateWithConnection(int clientfd, Status status) {
-	{
-		Mutex::Guard<std::map<int, Status> >	HandleGuard(conn->cHandleMut);
+	Mutex::Guard<std::map<int, Status> >	HandleGuard(conn->cHandleMut);
+	if (status == IN_PROGRESS)
+		this->conn->ClientsBeingHandled.erase(clientfd);
+	else
 		this->conn->ClientsBeingHandled[clientfd] = status; // its done being handled
-	}
-//	if (!open) {
-//		Mutex::Guard<std::map<int, bool> >	DelGuard(conn->cDelMut);
-//		this->conn->ClientsToBeDeleted[clientfd] = true; // this value doesnt matter
-//	}
 }
