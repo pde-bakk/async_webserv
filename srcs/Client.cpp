@@ -11,8 +11,6 @@
 
 int g_sigpipe;
 
-#if BONUS
-
 Client::Client() : conn(), parent(), fd(), port(), open(), addr(), size(), lastRequest(), mut(*this), TaskInProgress(), DoneReading() {
 }
 
@@ -62,50 +60,6 @@ Client::~Client() {
 	fd = -1;
 	Mutex::Guard<Client>	ClientMutexGuard(this->mut);
 }
-#else
-Client::Client() : conn(), parent(), fd(), port(), open(), addr(), size(), lastRequest() {
-}
-Client::Client(const Client &x) : conn(), parent(), fd(), port(), open(), addr(), size(), lastRequest() {
-	*this = x;
-}
-
-
-Client::Client(Server* S, Connection* conn) : conn(conn), parent(S), fd(), port(), open(true), addr(), size(sizeof(addr)), lastRequest(0), parsedRequest() {
-	bzero(&addr, size);
-	this->fd = accept(S->getSocketFd(), (struct sockaddr*)&addr, &size);
-	if (this->fd == -1) {
-		std::cerr << _RED _BOLD "Error accepting connection\n" _END;
-		throw std::runtime_error(strerror(errno));
-	}
-	if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
-		std::cerr << _RED _BOLD "Error setting connection fd to be nonblocking\n" _END;
-		throw std::runtime_error(strerror(errno));
-	}
-	int opt = 1;
-	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
-		std::cerr << _RED _BOLD "Error setting connection fd socket options\n" _END;
-		throw std::runtime_error(strerror(errno));
-	}
-	this->host = inet_ntoa(addr.sin_addr);
-	this->port = htons(addr.sin_port);
-	this->ipaddress = host + ':' + ft::inttostring(port);
-
-	FD_SET(this->fd, &readFdsBak);
-
-//	if (CONNECTION_LOGS)
-	std::cerr << _YELLOW "Opened a new client for " << fd << " at " << ipaddress << std::endl << _END;
-}
-
-Client::~Client() {
-	std::cout << "deleting client on fd " << fd << "\n";
-	close(fd);
-	req.clear();
-	this->parsedRequest.clear();
-	FD_CLR(this->fd, &readFdsBak);
-	FD_CLR(this->fd, &writeFdsBak);
-	fd = -1;
-}
-#endif
 
 int Client::receiveRequest() {
 	char buf[BUFLEN + 1];
@@ -121,7 +75,7 @@ int Client::receiveRequest() {
 		recvCheck = true;
 	}
 	if (recvRet == -1) {
-		std::cout << _RED "After recv loop, recvRet is " << recvRet << ", and recvCheck is " << std::boolalpha << recvCheck << "\n" _END;
+//		std::cout << _RED "After recv loop, recvRet is " << recvRet << ", and recvCheck is " << std::boolalpha << recvCheck << "\n" _END;
 //		std::cout << _RED << strerror(errno) << "\n" _END;
 	}
 	if (recvRet == 0 || !recvCheck) { // socket closed
@@ -174,14 +128,11 @@ void Client::checkTimeout() {
 void Client::reset() {
 	if (this->parsedRequest.headers[CONNECTION] == "close") {
 		std::cout << _CYAN "Setting connection to closed because of request header\n" _END;
-		if (CONNECTION_LOGS)
-			std::cout << "We ain't resetting, we're closing this client, baby" << "\n";
 		this->open = false;
 		return;
 	} else if (!this->open)
 		return;
-	if (CONNECTION_LOGS)
-		std::cout << "Resetting client!\n";
+	std::cout << "Resetting client!\n";
 	this->open = true;
 	req.clear();
 	lastRequest = 0;
@@ -211,10 +162,8 @@ Client &Client::operator=(const Client &x) {
 		ipaddress = x.ipaddress;
 		lastRequest = x.lastRequest;
 		parsedRequest = x.parsedRequest;
-#if BONUS
 		TaskInProgress = x.TaskInProgress;
 		DoneReading = x.DoneReading;
-#endif
 	}
 	return *this;
 }

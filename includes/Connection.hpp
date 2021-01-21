@@ -13,10 +13,8 @@
 #ifndef CONNECTION_HPP
 # define CONNECTION_HPP
 # include	"Server.hpp"
-# if BONUS
 #  include	"Worker.hpp"
 #  include	"ThreadPool.hpp"
-# endif
 # include	<set>
 # include	<utility>
 # include 	<queue>
@@ -34,7 +32,6 @@ class Connection {
 	std::vector<Server*> _servers;
 	char*	_configPath;
 	bool	alive;
-#if BONUS
 	size_t	worker_amount;
 	ThreadPool*	threadPool;
 	Mutex::Mutex<fd_set>	readmutex,
@@ -54,7 +51,6 @@ public:
 	void	receiveRequest(Client* c);
 	void	handleResponse(Client* c);
 	void	deleteTimedOutClients();
-#endif
 public:
 	friend struct Client;
 	explicit Connection(char* configPath);

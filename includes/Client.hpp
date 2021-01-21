@@ -10,12 +10,6 @@
 #include	"Colours.hpp"
 #include    "Mutex.hpp"
 
-# ifndef CONNECTION_LOGS
-#  define CONNECTION_LOGS 1
-# endif
-#ifndef BONUS
-# define BONUS 1
-#endif
 #define	BUFLEN 8192
 
 class Connection;
@@ -33,11 +27,9 @@ struct Client {
 				ipaddress;
 	time_t	lastRequest;
 	request_s	parsedRequest;
-#if BONUS
 	Mutex::Mutex<Client>	mut;
 	bool	TaskInProgress,
 			DoneReading;
-#endif
 
 	explicit Client(Server* x, Connection* conn);
 	Client(const Client& x);

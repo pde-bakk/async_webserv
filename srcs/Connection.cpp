@@ -28,12 +28,10 @@ fd_set	readFds, // temp file descriptor list for select()
 				readFdsBak, // temp file descriptor list for select()
 				writeFdsBak;
 
-Connection::Connection(char* configPath) : _socketFd(-1), _configPath(), alive(true)
-#if BONUS
-		,worker_amount(0), threadPool(NULL),
+Connection::Connection(char* configPath) : _socketFd(-1), _configPath(), alive(true),
+		worker_amount(0), threadPool(NULL),
 		readmutex(readFds), readbakmutex(readFdsBak), writemutex(writeFds), writebakmutex(writeFdsBak),
 		cHandleMut(ClientsBeingHandled), AliveMut(this->alive)
-#endif
 {
 	FD_ZERO(&readFds);
 	FD_ZERO(&writeFds);
@@ -47,20 +45,16 @@ Connection::~Connection() {
 }
 
 
-Connection::Connection() : _socketFd(-1), _configPath(), alive(true)
-#if BONUS
-		,worker_amount(0), threadPool(NULL),
+Connection::Connection() : _socketFd(-1), _configPath(), alive(true),
+		worker_amount(0), threadPool(NULL),
 		readmutex(readFds), readbakmutex(readFdsBak), writemutex(writeFds), writebakmutex(writeFdsBak),
-						   cHandleMut(ClientsBeingHandled), AliveMut(this->alive)
-#endif
+		cHandleMut(ClientsBeingHandled), AliveMut(this->alive)
 { }
 
-Connection::Connection(const Connection& obj) : _socketFd(), _configPath(), alive(true)
-#if BONUS
-		,worker_amount(0), threadPool(NULL),
+Connection::Connection(const Connection& obj) : _socketFd(), _configPath(), alive(true),
+		worker_amount(0), threadPool(NULL),
 		readmutex(readFds), readbakmutex(readFdsBak), writemutex(writeFds), writebakmutex(writeFdsBak),
-												cHandleMut(ClientsBeingHandled), AliveMut(this->alive)
-#endif
+		cHandleMut(ClientsBeingHandled), AliveMut(this->alive)
 {
 	*this = obj;
 }
@@ -82,14 +76,10 @@ void Connection::startServer() {
 	THIS = this;
 	signal(SIGINT, Connection::signalServer);
 	signal(SIGPIPE, Client::breakOnSIGPIPE);
-#if BONUS
 	if (worker_amount > 0)
 		this->multiThreadedListening();
 	else
 		this->startListening();
-#else
-	this->startListening();
-#endif
 }
 
 void Connection::signalServer(int) {
@@ -111,10 +101,8 @@ void Connection::stopServer() {
 	FD_ZERO(&writeFds);
 	FD_ZERO(&readFdsBak);
 	FD_ZERO(&writeFdsBak);
-#if BONUS
 	delete this->threadPool;
 	this->threadPool = NULL;
-#endif
 	std::cout << "After deleting threadPool\n";
 	std::cout << _GREEN "Server stopped gracefully.\n" << _END;
 }
@@ -128,40 +116,38 @@ void Connection::loadConfiguration() {
 		FD_SET((*it)->getSocketFd(), &readFdsBak);
 		this->_allConnections.insert((*it)->getSocketFd());
 	}
-#if BONUS
 	this->threadPool = new ThreadPool(this->worker_amount, this);
-#endif
 }
 
 void Connection::handleCLI() {
-#if BONUS
-	Mutex::Guard<fd_set>	ReadGuard(this->readmutex);
-#endif
+	{
+		Mutex::Guard<fd_set>	ReadGuard(this->readmutex);
+		if (!FD_ISSET(0, &readFds))
+			return;
+	}
 
-	if (FD_ISSET(0, &readFds)) {
-		std::string input;
-		std::getline(std::cin, input);
+	std::string input;
+	std::getline(std::cin, input);
 
-		if (input == "exit") {
-			std::cout << "Shutting down..." << std::endl;
-			stopServer();
-			exit(0);
-		}
-		else if (input == "restart") {
-			std::cout << "Restarting server..." << std::endl;
-			stopServer();
-			startServer();
-		}
-		else if (input == "help") {
-			std::cout << "Please use one of these commands:\n"
-						 "\n"
-						 "   help              For this help\n"
-						 "   exit              Shut down the server\n"
-						 "   restart           Restart the server\n" << std::endl;
-		}
-		else {
-			std::cout << "Command \"" << input << "\" not found. Type \"help\" for available commands" << std::endl;
-		}
+	if (input == "exit") {
+		std::cout << "Shutting down..." << std::endl;
+		stopServer();
+		exit(0);
+	}
+	else if (input == "restart") {
+		std::cout << "Restarting server..." << std::endl;
+		stopServer();
+		startServer();
+	}
+	else if (input == "help") {
+		std::cout << "Please use one of these commands:\n"
+					 "\n"
+					 "   help              For this help\n"
+					 "   exit              Shut down the server\n"
+					 "   restart           Restart the server\n" << std::endl;
+	}
+	else {
+		std::cout << "Command \"" << input << "\" not found. Type \"help\" for available commands" << std::endl;
 	}
 }
 
@@ -186,10 +172,8 @@ void Connection::parsefile() {
 			continue ;
 		ft::get_key_value(str, key, value);
 
-#if BONUS
 		if (key == "workers")
 			this->worker_amount = ft_atoi(value.c_str());
-#endif
 
 		if (key == "server" && value == "{") {
 			try {
@@ -218,7 +202,6 @@ void Connection::startListening() {
 			break;
 		readFds = readFdsBak;
 		writeFds = writeFdsBak;
-//		this->_servers.front()->showclients(_readFds, _writeFds);
 		if (::select(this->getMaxFD(), &readFds, &writeFds, 0, 0) == -1)
 			throw std::runtime_error(strerror(errno));
 		if (FD_ISSET(0, &readFdsBak))
@@ -278,7 +261,6 @@ void Connection::startListening() {
 	}
 }
 
-#if BONUS
 void Connection::multiThreadedListening() {
 	std::cout << "Waiting for connections... with " << this->worker_amount << " workers" _END << std::endl;
 	while (alive) {
@@ -289,6 +271,9 @@ void Connection::multiThreadedListening() {
 		}
 		this->transferFD_sets();
 		this->select();
+//		if (rand() % 10 == 0)
+//			std::cout << _BLUE;
+//		std::cout << "after select\n" _END;
 		this->handleCLI();
 		// Go through existing connections looking for data to read
 		for (std::vector<Server *>::iterator it = _servers.begin(); it != _servers.end(); ++it) {
@@ -305,11 +290,11 @@ void Connection::multiThreadedListening() {
 					}
 				}
 				{
-					std::cout << "before handleresponse\n";
+//					std::cout << "before handleresponse\n";
 					this->handleResponse(c);
-					std::cout << "before receiveRequest\n";
+//					std::cout << "before receiveRequest\n";
 					this->receiveRequest(c);
-					std::cout << "after receiveRequest\n";
+//					std::cout << "after receiveRequest\n";
 				}
 				++itc;
 			}
@@ -350,18 +335,14 @@ void Connection::checkServer(Server* s) {
 void Connection::receiveRequest(Client *c) {
 	Mutex::Guard<fd_set>	readguard(this->readmutex),
 							writebakguard(this->writebakmutex);
-	if (FD_ISSET(c->fd, &readFds)) {
-		std::cout << "readfd is set\n";
+	if (FD_ISSET(c->fd, &readFds))
 		this->threadPool->AddTaskToQueue(new std::pair<std::string, Client*>("receive", c));
-	}
 }
 
 void Connection::handleResponse(Client *c) {
 	Mutex::Guard<fd_set>	writeguard(this->writemutex);
-	if (FD_ISSET(c->fd, &writeFds)) {
-		std::cout << "writefd is set\n";
+	if (FD_ISSET(c->fd, &writeFds))
 		this->threadPool->AddTaskToQueue(new std::pair<std::string, Client*>("handle", c));
-	}
 }
 
 void Connection::deleteTimedOutClients() {
@@ -390,12 +371,12 @@ void Connection::deleteTimedOutClients() {
 			}
 			{
 				if (ClearWrite) {
-					std::cout << "Clearing writebak\n";
+//					std::cout << "Clearing writebak\n";
 					Mutex::Guard<fd_set> WriteBackupGuard(writebakmutex);
 					FD_CLR(cli->fd, &writeFdsBak);
 				}
 				if (SetWrite) {
-					std::cout << "Setting writebak\n";
+//					std::cout << "Setting writebak\n";
 					Mutex::Guard<fd_set> WriteBackupGuard(writebakmutex);
 					FD_SET(cli->fd, &writeFdsBak);
 				}
@@ -415,5 +396,3 @@ void Connection::deleteTimedOutClients() {
 		}
 	}
 }
-
-#endif
